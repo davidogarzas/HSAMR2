@@ -1,4 +1,4 @@
-package parkingRobot.hsamr0;
+package parkingRobot.hsamr2;
 
 import lejos.geom.Line;
 import lejos.robotics.navigation.Pose;
@@ -7,7 +7,7 @@ import parkingRobot.INavigation;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
-import parkingRobot.hsamr0.NavigationThread;
+import parkingRobot.hsamr2.NavigationThread;
 
 
 /**

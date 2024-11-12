@@ -1,4 +1,4 @@
-package parkingRobot.hsamr0;
+package parkingRobot.hsamr2;
 
 import lejos.nxt.Button;
 import lejos.nxt.MotorPort;
@@ -13,10 +13,10 @@ import parkingRobot.IMonitor;
 import lejos.geom.Line;
 import lejos.nxt.LCD;
 
-import parkingRobot.hsamr0.ControlRST;
-import parkingRobot.hsamr0.HmiPLT;
-import parkingRobot.hsamr0.NavigationAT;
-import parkingRobot.hsamr0.PerceptionPMP;
+import parkingRobot.hsamr2.ControlRST;
+import parkingRobot.hsamr2.HmiPLT;
+import parkingRobot.hsamr2.NavigationAT;
+import parkingRobot.hsamr2.PerceptionPMP;
 
 
 /**

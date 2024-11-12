@@ -1,4 +1,4 @@
-package parkingRobot.hsamr0;
+package parkingRobot.hsamr2;
 
 import parkingRobot.IControl;
 

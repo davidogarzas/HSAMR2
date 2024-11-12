@@ -1,4 +1,4 @@
-package parkingRobot.hsamr0;
+package parkingRobot.hsamr2;
 
 
 //import lejos.nxt.LCD;
@@ -13,7 +13,7 @@ import lejos.nxt.SensorPort;
 
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
-import parkingRobot.hsamr0.PerceptionThread;
+import parkingRobot.hsamr2.PerceptionThread;
 import lejos.nxt.comm.*;
 
 /**
