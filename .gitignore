@@ -1,6 +1,3 @@
 
-/view
-.classpath
-.project
-/bin
-/doc
+/view/*
+
