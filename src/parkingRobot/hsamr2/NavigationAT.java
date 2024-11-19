@@ -276,8 +276,6 @@ public class NavigationAT implements INavigation{
 		
 		double angleResultSensors = 0;
 		double angleResultSensorsDegrees = 0;
-		
-		double test_var = 0;
 				
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
