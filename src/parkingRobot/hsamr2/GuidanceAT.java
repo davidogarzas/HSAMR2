@@ -88,7 +88,15 @@ public class GuidanceAT {
 	 */
 	static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
 	
+	static Line test_line0 = new Line(  0,  0, 75,  0);
+	static Line test_line1 = new Line(75,  0, 75, 60);
+	static Line test_line2 = new Line(75, 60, 45, 60);
+	static Line test_line3 = new Line(45, 60, 45, 30);
+	static Line test_line4 = new Line(45, 30,  0, 30);
+	static Line test_line5 = new Line( 0, 30,  0, 0);
 	
+	static Line[] test_map = {test_line0, test_line1, test_line2, test_line3, test_line4, test_line5};
+
 	/**
 	 * main method of project 'ParkingRobot'
 	 * 
