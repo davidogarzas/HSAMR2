@@ -41,7 +41,7 @@ public class NavigationAT implements INavigation{
 	double nextLineAngleDegrees = 0;
 	double lastAngleResult = 0;
 	boolean initialize = false;
-	LinkedList<ParkingSlot> parkingSlotList = new LinkedList<ParkingSlot>();
+	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
 	
 	// For parkingSlots
 	float beginX = 0;
@@ -223,7 +223,7 @@ public class NavigationAT implements INavigation{
 	 */
 	public synchronized ParkingSlot[] getParkingSlots() {
 		
-		return (ParkingSlot[]) this.parkingSlotList.toArray();
+		return this.parkingSlotsList.toArray(new ParkingSlot[this.parkingSlotsList.size()]);
 	}
 	
 	
