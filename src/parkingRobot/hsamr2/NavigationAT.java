@@ -1,77 +1,99 @@
 package parkingRobot.hsamr2;
 
+import java.util.LinkedList;
+
 import lejos.geom.Line;
+import lejos.geom.Point;
 import lejos.robotics.navigation.Pose;
 
 import parkingRobot.INavigation;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
+import parkingRobot.INavigation.ParkingSlot.ParkingSlotStatus;
 import parkingRobot.hsamr2.NavigationThread;
 
-
 /**
- * A executable basic example implementation of the corresponding interface provided by the Institute of Automation with
+ * A executable basic example implementation of the corresponding interface provided by the 
+ * Institute of Automation with
  * limited functionality:
  * <p>
- * In this example only the both encoder sensors from the {@link IPerception} implementation are used for periodically calculating
- * the robots position and corresponding heading angle (together called 'pose'). Neither any use of the map information or other
- * perception sensor information is used nor any parking slot detection is performed, although the necessary members are already
- * prepared. Advanced navigation calculation and parking slot detection should be developed and invented by the students.  
+ * In this example only the both encoder sensors from the {@link IPerception} implementation are 
+ * used for periodically calculating
+ * the robots position and corresponding heading angle (together called 'pose'). 
+ * Neither any use of the map information or other
+ * perception sensor information is used nor any parking slot detection is performed, 
+ * although the necessary members are already
+ * prepared. Advanced navigation calculation and parking slot detection should be developed 
+ * and invented by the students.  
  * 
  * @author IfA
  */
+
 public class NavigationAT implements INavigation{
 	
-	/**
-	 * line information measured by right light sensor: 0 - beside line, 1 - on line border or gray underground, 2 - on line
-	 */
-	int lineSensorRight	=	0;
-	/**
-	 * line information measured by left light sensor: 0 - beside line, 1 - on line border or gray underground, 2 - on line
-	 */
-	int lineSensorLeft	=	0;
+	// Custom Variables
+	int currentLine = 0;
+	int lapNumber = 0;
+	double currentLineAngle = 0;
+	double currentLineAngleDegrees = 0;
+	double nextLineAngle = 0;
+	double nextLineAngleDegrees = 0;
+	double lastAngleResult = 0;
+	boolean initialize = false;
+	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
+	
+	// For parkingSlots
+	float beginX = 0;
+	float beginY = 0;
+	Point parkingSlotBegin = new Point(0,0);
+	Point parkingSlotEnd = new Point(0,0);
+	float finalX = 0;
+	float finalY = 0;
+	int state = 0;
+	double sizeRobot = 30/100; // Check size
+	int parkingSlotID = 1;
 	
 	/**
-	 * reference to {@link IPerception.EncoderSensor} class for left robot wheel which measures the wheels angle difference
-	 * between actual an last request
+	 * line information measured by light sensor: 0 - beside line, 1 - on line border or 
+	 * gray underground, 2 - on line
+	 */
+	int lineSensorRight	=	0;
+	int lineSensorLeft	=	0;
+		
+	/**
+	 * reference to {@link IPerception.EncoderSensor} class for robot wheels which 
+	 * measures the wheels angle difference between actual and last request
 	 */
 	IPerception.EncoderSensor encoderLeft							=	null;
-	/**
-	 * reference to {@link IPerception.EncoderSensor} class for right robot wheel which measures the wheels angle difference
-	 * between actual an last request
-	 */
 	IPerception.EncoderSensor encoderRight							=	null;
 	
 	/**
-	 * reference to data class for measurement of the left wheels angle difference between actual an last request and the
-	 * corresponding time difference
+	 * reference to data class for measurement of the wheels angle difference between actual 
+	 * and last request and the corresponding time difference
 	 */
 	IPerception.AngleDifferenceMeasurement angleMeasurementLeft 	= 	null;
-	/**
-	 * reference to data class for measurement of the right wheels angle difference between actual an last request and the
-	 * corresponding time difference
-	 */
 	IPerception.AngleDifferenceMeasurement angleMeasurementRight	= 	null;
 	
 	/**
-	 * reference to {@link IPerception.OdoSensor} class for mouse odometry sensor to measure the ground displacement
-	 * between actual an last request
+	 * reference to {@link IPerception.OdoSensor} class for mouse odometry sensor to measure 
+	 * the ground displacement between actual an last request
 	 */
 	IPerception.OdoSensor mouseodo = null;	
 		
 	/**
-	 * reference to data class for measurement of the mouse odometry sensor to measure the ground displacement between
-	 * actual an last request and the corresponding time difference
+	 * reference to data class for measurement of the mouse odometry sensor to measure the 
+	 * ground displacement between actual an last request and the corresponding time difference
 	 */
 	IPerception.OdoDifferenceMeasurement mouseOdoMeasurement = null;
 	
 	/**
-	 * distance from optical sensor pointing in driving direction to obstacle in mm
+	 * distance from optical sensors pointing in driving direction to obstacle in mm
 	 */
 	double frontSensorDistance		=	0;
 	/**
-	 * distance from optical sensor pointing to the right side of robot to obstacle in mm (sensor mounted at the front)
+	 * distance from optical sensor pointing to the right side of robot to obstacle in mm 
+	 * (sensor mounted at the front)
 	 */
 	double frontSideSensorDistance	=	0;
 	/**
@@ -79,27 +101,28 @@ public class NavigationAT implements INavigation{
 	 */
 	double backSensorDistance		=	0;
 	/**
-	 * distance from optical sensor pointing to the right side of robot to obstacle in mm (sensor mounted at the back)
+	 * distance from optical sensor pointing to the right side of robot to obstacle in mm 
+	 * (sensor mounted at the back)
 	 */
 	double backSideSensorDistance	=	0;
 
-
 	/**
-	 * robot specific constant: radius of left wheel
+	 * robot specific constant: radius of wheels
 	 */
-	static final double LEFT_WHEEL_RADIUS	= 	0.028; // only rough guess, to be measured exactly and maybe refined by experiments
-	/**
-	 * robot specific constant: radius of right wheel
-	 */
-	static final double RIGHT_WHEEL_RADIUS	= 	0.028; // only rough guess, to be measured exactly and maybe refined by experiments
+	static final double LEFT_WHEEL_RADIUS	= 	0.028; 
+	static final double RIGHT_WHEEL_RADIUS	= 	0.028; 
+	// only rough guess, to be measured exactly and maybe refined by experiments
+	
 	/**
 	 * robot specific constant: distance between wheels
 	 */
-	static final double WHEEL_DISTANCE		= 	0.114; // only rough guess, to be measured exactly and maybe refined by experiments
+	static final double WHEEL_DISTANCE		= 	0.155; 
+	// only rough guess, to be measured exactly and maybe refined by experiments
 
 	
 	/**
-	 * map array of line references, whose corresponding lines form a closed chain and represent the map of the robot course
+	 * map array of line references, whose corresponding lines form a closed chain 
+	 * and represent the map of the robot course
 	 */
 	Line[] map 								= null;
 	/**
@@ -126,8 +149,8 @@ public class NavigationAT implements INavigation{
 
 	
 	/**
-	 * provides the reference transfer so that the class knows its corresponding perception object (to obtain the measurement
-	 * information from) and starts the navigation thread.
+	 * provides the reference transfer so that the class knows its corresponding perception 
+	 * object (to obtain the measurement information from) and starts the navigation thread.
 	 * 
 	 * @param perception corresponding main module Perception class object
 	 * @param monitor corresponding main module Monitor class object
@@ -139,8 +162,21 @@ public class NavigationAT implements INavigation{
 		this.encoderRight = perception.getNavigationRightEncoder();
 		this.mouseodo = perception.getNavigationOdo();		
 		
+		// MONITOR VARIABLES
+		monitor.addNavigationVar("X");
+		monitor.addNavigationVar("Y");
+		monitor.addNavigationVar("Phi");
+		monitor.addNavigationVar("PhiError");
+		
+		// INIT MAP
+		setMap(GuidanceAT.test_map);
+		this.currentLineAngleDegrees = 0;
+		// this.nextLineAngleDegrees = Math.toDegrees(this.map[1].getP1().angleTo(this.map[1].getP2()));
+		this.nextLineAngleDegrees = Math.toDegrees(Math.atan2(map[1].getY2()-map[1].getY1(), map[1].getX2()-map[1].getX1()));
+		
 		navThread.setPriority(Thread.MAX_PRIORITY - 1);
-		navThread.setDaemon(true); // background thread that is not need to terminate in order for the user program to terminate
+		navThread.setDaemon(true); 
+		// background thread that is not need to terminate in order for the user program to terminate
 		navThread.start();
 	}
 	
@@ -171,9 +207,6 @@ public class NavigationAT implements INavigation{
 		this.calculateLocation();
 		if (this.parkingSlotDetectionIsOn)
 				this.detectParkingSlot();
-		
-		// MONITOR (example)
-//		monitor.writeNavigationComment("Navigation");
 	}
 	
 	
@@ -189,14 +222,16 @@ public class NavigationAT implements INavigation{
 	 * @see parkingRobot.INavigation#getParkingSlots()
 	 */
 	public synchronized ParkingSlot[] getParkingSlots() {
-		return null;
+		
+		return this.parkingSlotsList.toArray(new ParkingSlot[this.parkingSlotsList.size()]);
 	}
 	
 	
 	// Private methods
 	
 	/**
-	 * calls the perception methods for obtaining actual measurement data and writes the data into members
+	 * calls the perception methods for obtaining actual measurement data and writes 
+	 * the data into members
 	 */
 	private void updateSensors(){		
 		this.lineSensorRight		= perception.getRightLineSensor();
@@ -217,6 +252,7 @@ public class NavigationAT implements INavigation{
 	 * calculates the robot pose from the measurements
 	 */
 	private void calculateLocation(){
+		
 		double leftAngleSpeed 	= this.angleMeasurementLeft.getAngleSum()  / ((double)this.angleMeasurementLeft.getDeltaT()/1000);  //degree/seconds
 		double rightAngleSpeed 	= this.angleMeasurementRight.getAngleSum() / ((double)this.angleMeasurementRight.getDeltaT()/1000); //degree/seconds
 
@@ -231,8 +267,16 @@ public class NavigationAT implements INavigation{
 
 		double xResult 		= 0;
 		double yResult 		= 0;
-		double angleResult 	= 0;
 		
+		double xMap			= 0;
+		double yMap			= 0;
+		
+		double angleResult 	= 0;
+		double angleResultDegrees = 0;
+		
+		double angleResultSensors = 0;
+		double angleResultSensorsDegrees = 0;
+				
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
 		if (R.isNaN()) { //robot don't move
@@ -252,14 +296,151 @@ public class NavigationAT implements INavigation{
 			angleResult 	= this.pose.getHeading() + w * deltaT;
 		}
 		
+		// Turns Angle to Degrees
+		angleResultDegrees = Math.toDegrees(angleResult);
+		
+		/*
+		// If sensors are parallel to wall (Measure same distance)
+		if (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1){
+				
+			// For printing in degrees
+			angleResultSensorsDegrees = this.currentLineAngleDegrees;
+
+			// If angle difference is big enough?
+			// if (Math.abs(angleResultSensors - angleResultDegrees) >= 5)
+			monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResultDegrees)
+					+ " to: " + String.valueOf(angleResultSensorsDegrees));
+			
+			// Updates angleResult
+			angleResult = this.currentLineAngle;		
+		}
+		*/
+		
+		// Detects change of line (may change method of detection)
+		if (Math.abs(angleResultDegrees - this.nextLineAngleDegrees) <= 20){
+			
+			// Updates Current Line Index
+			// Resets line number when finishing the lap
+			if (currentLine < this.map.length - 1){
+				currentLine++;
+				if (currentLine == this.map.length - 1){this.lapNumber++;}
+			}
+			else {
+				currentLine = 0;
+			}
+			
+			// Saves Current Line Angle
+			this.currentLineAngle = this.nextLineAngle;
+			this.currentLineAngleDegrees = this.nextLineAngleDegrees;
+			
+			// Calculates Next Line Angle
+			if (currentLine == this.map.length - 1){this.nextLineAngle = Math.atan2(map[0].getY2()-map[0].getY1(), map[0].getX2()-map[0].getX1());} 
+			else {this.nextLineAngle = Math.atan2(map[currentLine+1].getY2()-map[currentLine+1].getY1(), map[currentLine+1].getX2()-map[currentLine+1].getX1());}
+			
+			nextLineAngleDegrees = Math.toDegrees(nextLineAngle);
+			
+			// Turns all angles positive and can go above 360°
+			if (this.nextLineAngleDegrees < 0){this.nextLineAngleDegrees += 360;}
+			nextLineAngleDegrees = nextLineAngleDegrees + 360*this.lapNumber;
+			
+			// Gets X Y from Map Coordinates
+			xMap = this.map[currentLine].getX1() / 100;
+			yMap = this.map[currentLine].getY1() / 100;
+			
+			// Prints info
+			monitor.writeNavigationComment("Now on Line " + currentLine);
+			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
+			monitor.writeNavigationComment("Map X: " + String.valueOf(map[currentLine].getX1()) + " Y: " + String.valueOf(map[currentLine].getY1()));
+			
+			// Updates X Y to Map Coordinates
+			xResult = xMap;
+			yResult = yMap;
+		}
+		
+				
+		// MONITOR (example)
+		monitor.writeNavigationVar("X", "" + (xResult * 100));
+		monitor.writeNavigationVar("Y", "" + (yResult * 100));
+		monitor.writeNavigationVar("Phi", "" + angleResultDegrees);	
+		monitor.writeNavigationVar("PhiError", "" + (angleResultDegrees - this.currentLineAngle));	
+		
 		this.pose.setLocation((float)xResult, (float)yResult);
-		this.pose.setHeading((float)angleResult);		 
+		this.pose.setHeading((float)angleResult);
+		
 	}
 
 	/**
 	 * detects parking slots and manage them by initializing new slots, re-characterizing old slots or merge old and detected slots. 
 	 */
 	private void detectParkingSlot(){
+		
+		/*
+		// Variables
+
+		boolean newSlot = true;
+		
+		// state 0 = Looking for Possible Slot
+		// state 1 = May have found possible slot
+		
+		// Looking for Possible Slot
+		if (this.state == 0){
+				if (this.frontSideSensorDistance >= this.sizeRobot*100){
+					this.state = 1;
+					
+					// Saves Back Coordinates of Parking Slot
+					this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY());
+				}
+				
+		// May Have Found Possible Slot
+		} else if (this.state == 1){
+			
+			// Did not find possibleParkingSlot
+			// Did not cover enough distance before FrontSideSensor stopped detecting enough 
+			// depth for robot
+			if (Math.abs(this.pose.distanceTo(this.parkingSlotBegin)) < this.sizeRobot*100 
+				&& this.frontSideSensorDistance < this.sizeRobot*100){
+				
+				this.state = 0;
+				// Look through array, see if first coordinate was saved and update slot
+			}
+			
+			// Found possible parkingSlot
+			// Covered enough distance in X or Y so that frontSideSensor and BackSideSensor
+			// both detect enough depth for robot
+			else if (this.pose.distanceTo(this.parkingSlotBegin) >= this.sizeRobot*100 
+					&& this.frontSideSensorDistance >= this.sizeRobot*100 
+					&& this.backSideSensorDistance >= this.sizeRobot*100){
+				
+				this.state = 0;
+				
+				// Saves Front Coordinates of ParkingSlot
+				this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
+				
+				// Check existing array
+				for (int i = 0; i < this.parkingSlotArray.length; i++) {
+					
+					// Parking Slot already exists
+					if (this.parkingSlotArray[i].getFrontBoundaryPosition().distance(this.parkingSlotEnd) < 5
+						&& this.parkingSlotArray[i].getBackBoundaryPosition().distance(this.parkingSlotBegin) < 5){	
+						// Update parking slot
+						newSlot = false;
+						break;
+					}
+				}
+				
+				// If Parking Slot didnt already exist
+				if (newSlot){
+					ParkingSlot parkingSlotObj = new ParkingSlot(
+							this.parkingSlotID, 
+							this.parkingSlotBegin, 
+							this.parkingSlotEnd, 
+							ParkingSlotStatus.SUITABLE_FOR_PARKING, 
+							10);
+					// Add to array
+				}
+			}
+		}
+		*/
 		return; // has to be implemented by students
 	}
 }
