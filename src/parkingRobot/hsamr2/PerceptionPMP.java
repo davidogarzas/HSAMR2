@@ -157,11 +157,11 @@ public class PerceptionPMP implements IPerception {
 	}
 	
 	public void showSensorData() {
-		LCD.clear();
-		LCD.drawString("Sensordata ", 0, 0);
-		LCD.drawString("U: "+this.UOdmometry, 0, 1);
-		LCD.drawString("V: "+this.VOdometry, 0, 2);
-		LCD.drawString("OdoT: "+this.OdometryT, 0, 3);
+		//LCD.clear();
+		//LCD.drawString("Sensordata ", 0, 0);
+		//LCD.drawString("U: "+this.UOdmometry, 0, 1);
+		//LCD.drawString("V: "+this.VOdometry, 0, 2);
+		//LCD.drawString("OdoT: "+this.OdometryT, 0, 3);
 		LCD.drawString("Front: "+this.FrontSensorDistance, 0, 4);
 		LCD.drawString("Fside: "+this.FrontSideSensorDistance, 0, 5);
 		LCD.drawString("Back: "+this.BackSensorDistance, 0, 6);
