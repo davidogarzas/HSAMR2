@@ -102,6 +102,10 @@ public class ControlRST implements IControl {
 		// MONITOR (example)
 		monitor.addControlVar("RightSensor");
 		monitor.addControlVar("LeftSensor");
+		monitor.addControlVar("RightWheelPower");
+		monitor.addControlVar("LeftWheelPower");
+		monitor.addControlVar("Error");
+		monitor.addControlVar("Correction");
 		
 		this.ctrlThread = new ControlThread(this);
 		
@@ -255,13 +259,61 @@ public class ControlRST implements IControl {
 	private void exec_LINECTRL_ALGO(){
 		leftMotor.forward();
 		rightMotor.forward();
+		
+		/* BESPIEL PROGRAM
 		int lowPower = 1;
 		int highPower = 45;
+		 */
 		
+		 // Farbwerte: 0 = weiﬂ, 1 = grau, 2 = schwarz
+        int sensorLeftValue = this.lineSensorLeft;
+        int sensorRightValue = this.lineSensorRight;
+
+        // Leistungsparameter
+        int basePower = 30;  // Basisgeschwindigkeit
+        int maxCorrection = 50;  // Maximale Abweichungskorrektur
+        float p = 25;
+
+        // Berechnung des Fehlers
+        int error = sensorLeftValue - sensorRightValue;
+
+        // Proportionalsteuerung
+        float correction = error * p;
+
+        // Begrenzung der Korrekturwerte
+        if (correction < -maxCorrection) {correction = -maxCorrection;}
+        else if (correction > maxCorrection) {correction = maxCorrection;}
+
+        // Anpassung der Motorleistung
+        int leftPower = Math.round(basePower - correction);
+        int rightPower = Math.round(basePower + correction);
+
+        // Begrenzung der Motorleistung auf zul‰ssige Werte
+        if (leftPower < -100) {leftPower = -100;}
+        else if (leftPower > 100) {leftPower = 100;}
+        
+        if (rightPower < -100) {rightPower = -100;}
+        else if (rightPower > 100) {rightPower = 100;}
+
+        // Motorleistung setzen
+        leftMotor.setPower(leftPower);
+        rightMotor.setPower(rightPower);
+
+        // MONITOR
+        
+        monitor.writeControlVar("LeftSensor", "" + sensorLeftValue);
+        monitor.writeControlVar("RightSensor", "" + sensorRightValue);
+        monitor.writeControlVar("RightWheelPower", "" + rightPower);
+		monitor.writeControlVar("LeftWheelPower", "" + leftPower);
+		monitor.writeControlVar("Correction", "" + correction);
+		monitor.writeControlVar("Error", "" + error);
+
+        /* BEISPIEL CONTROL
+		  
 		// MONITOR (example)
 		monitor.writeControlVar("LeftSensor", "" + this.lineSensorLeft);
-		monitor.writeControlVar("RightSensor", "" + this.lineSensorRight);
-
+		monitor.writeControlVar("RightSensor", "" + this.lineSensorRight);	
+		
         if(this.lineSensorLeft == 2 && (this.lineSensorRight == 1)){
 			
 			// when left sensor is on the line, turn left
@@ -318,7 +370,7 @@ public class ControlRST implements IControl {
 			
 			// MONITOR (example)
 			monitor.writeControlComment("turn right");
-		}
+		} */
 	}
 	
 	private void stop(){
