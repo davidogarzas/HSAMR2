@@ -169,7 +169,7 @@ public class NavigationAT implements INavigation{
 		monitor.addNavigationVar("PhiError");
 		
 		// INIT MAP
-		setMap(GuidanceAT.test_map);
+		setMap(GuidanceAT.map);
 		this.currentLineAngleDegrees = 0;
 		// this.nextLineAngleDegrees = Math.toDegrees(this.map[1].getP1().angleTo(this.map[1].getP2()));
 		this.nextLineAngleDegrees = Math.toDegrees(Math.atan2(map[1].getY2()-map[1].getY1(), map[1].getX2()-map[1].getX1()));
