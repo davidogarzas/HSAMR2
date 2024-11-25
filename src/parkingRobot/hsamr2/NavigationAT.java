@@ -116,7 +116,7 @@ public class NavigationAT implements INavigation{
 	/**
 	 * robot specific constant: distance between wheels
 	 */
-	static final double WHEEL_DISTANCE		= 	0.155; 
+	static final double WHEEL_DISTANCE		= 	0.138; 
 	// only rough guess, to be measured exactly and maybe refined by experiments
 
 	
