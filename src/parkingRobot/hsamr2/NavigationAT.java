@@ -42,6 +42,7 @@ public class NavigationAT implements INavigation{
 	double lastAngleResult = 0;
 	boolean initialize = false;
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
+	int timesParallel = 0;
 	
 	// For parkingSlots
 	float beginX = 0;
@@ -299,23 +300,6 @@ public class NavigationAT implements INavigation{
 		// Turns Angle to Degrees
 		angleResultDegrees = Math.toDegrees(angleResult);
 		
-		/*
-		// If sensors are parallel to wall (Measure same distance)
-		if (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1){
-				
-			// For printing in degrees
-			angleResultSensorsDegrees = this.currentLineAngleDegrees;
-
-			// If angle difference is big enough?
-			// if (Math.abs(angleResultSensors - angleResultDegrees) >= 5)
-			monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResultDegrees)
-					+ " to: " + String.valueOf(angleResultSensorsDegrees));
-			
-			// Updates angleResult
-			angleResult = this.currentLineAngle;		
-		}
-		*/
-		
 		// Detects change of line (may change method of detection)
 		if (Math.abs(angleResultDegrees - this.nextLineAngleDegrees) <= 20){
 			
@@ -340,6 +324,10 @@ public class NavigationAT implements INavigation{
 			nextLineAngleDegrees = Math.toDegrees(nextLineAngle);
 			
 			// Turns all angles positive and can go above 360°
+			if (this.nextLineAngle < 0){this.nextLineAngle += 2*Math.PI;}
+			nextLineAngle = nextLineAngle + 2*Math.PI*this.lapNumber;
+			
+			// Turns all angles positive and can go above 360°
 			if (this.nextLineAngleDegrees < 0){this.nextLineAngleDegrees += 360;}
 			nextLineAngleDegrees = nextLineAngleDegrees + 360*this.lapNumber;
 			
@@ -357,7 +345,45 @@ public class NavigationAT implements INavigation{
 			yResult = yMap;
 		}
 		
+		// Correction of angle
+		
+		// If both line sensors are on white (going straight)
+		if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
+			
+			// If sensors are measuring something
+			if (this.frontSideSensorDistance != 30 && this.backSideSensorDistance != 30){
 				
+				// If sensors are parallel to wall (Measure same distance)
+				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0){
+					
+					// If they have measured the same distance at least 3 times
+					if (this.timesParallel < 3){timesParallel++;}	
+					else if (this.timesParallel >= 3){
+						
+						// Corrects angle
+						this.timesParallel = 0;
+						
+						// For printing in degrees
+						angleResultSensors = this.currentLineAngle;
+						angleResultSensorsDegrees = this.currentLineAngleDegrees;
+
+						// If angle difference is big enough
+						if (Math.abs(angleResultSensorsDegrees - angleResultDegrees) >= 5){
+							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResultDegrees)
+								+ " to: " + String.valueOf(angleResultSensorsDegrees));
+							monitor.writeNavigationComment("(Radians) Corrected Angle from: " + String.valueOf(angleResult)
+									+ " to: " + String.valueOf(angleResultSensors));
+							
+							// Updates angleResult
+							angleResult = angleResultSensors;
+						}
+					}
+				
+				// Resets counter if they have not been consecutive equal measurements
+				} else {this.timesParallel = 0;}	
+			}
+		}
+	
 		// MONITOR (example)
 		monitor.writeNavigationVar("X", "" + (xResult * 100));
 		monitor.writeNavigationVar("Y", "" + (yResult * 100));
