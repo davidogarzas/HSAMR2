@@ -260,11 +260,6 @@ public class ControlRST implements IControl {
 		leftMotor.forward();
 		rightMotor.forward();
 		
-		/* BESPIEL PROGRAM
-		int lowPower = 1;
-		int highPower = 45;
-		 */
-		
 		 // Farbwerte: 0 = weiﬂ, 1 = grau, 2 = schwarz
         int sensorLeftValue = this.lineSensorLeft;
         int sensorRightValue = this.lineSensorRight;
@@ -307,9 +302,13 @@ public class ControlRST implements IControl {
 		monitor.writeControlVar("LeftWheelPower", "" + leftPower);
 		monitor.writeControlVar("Correction", "" + correction);
 		monitor.writeControlVar("Error", "" + error);
+		
 
         /* BEISPIEL CONTROL
 		  
+		int lowPower = 1;
+		int highPower = 45;
+  
 		// MONITOR (example)
 		monitor.writeControlVar("LeftSensor", "" + this.lineSensorLeft);
 		monitor.writeControlVar("RightSensor", "" + this.lineSensorRight);	
@@ -370,7 +369,8 @@ public class ControlRST implements IControl {
 			
 			// MONITOR (example)
 			monitor.writeControlComment("turn right");
-		} */
+		} 
+		BEISPIEL CONTROL */
 	}
 	
 	private void stop(){
