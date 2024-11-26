@@ -321,7 +321,7 @@ public class NavigationAT implements INavigation{
 			
 			// Updates Current Line Index
 			// Resets line number when finishing the lap
-			if (currentLine < this.map.length - 1){
+			if (currentLine < this.map.length - 3){
 				currentLine++;
 				if (currentLine == this.map.length - 1){this.lapNumber++;}
 			}
