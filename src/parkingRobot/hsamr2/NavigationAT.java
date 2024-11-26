@@ -252,6 +252,7 @@ public class NavigationAT implements INavigation{
 	 */
 	private void calculateLocation(){
 		
+		// Variable Declarations
 		double leftAngleSpeed 	= this.angleMeasurementLeft.getAngleSum()  / ((double)this.angleMeasurementLeft.getDeltaT()/1000);  //degree/seconds
 		double rightAngleSpeed 	= this.angleMeasurementRight.getAngleSum() / ((double)this.angleMeasurementRight.getDeltaT()/1000); //degree/seconds
 
@@ -274,6 +275,7 @@ public class NavigationAT implements INavigation{
 				
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
+		// Calculate Odometry with Encoders
 		if (R.isNaN()) { //robot don't move
 			xResult			= this.pose.getX();
 			yResult			= this.pose.getY();
@@ -290,7 +292,9 @@ public class NavigationAT implements INavigation{
 			yResult 		= Math.sin(w * deltaT) * (this.pose.getX()-ICCx) + Math.cos(w * deltaT) * (this.pose.getY() - ICCy) + ICCy;
 			angleResult 	= Math.toDegrees(this.pose.getHeading() + w * deltaT);
 		}
-				
+		
+		// Correction of XY Coordinates according to Map
+		
 		// Detects change of line (may change method of detection)
 		if (Math.abs(angleResult - this.nextLineAngle) <= 20){
 			
@@ -298,6 +302,9 @@ public class NavigationAT implements INavigation{
 			// Resets line number when finishing the lap
 			if (currentLine < this.map.length - 1){
 				currentLine++;
+				
+				// Increases lap number when it is on the last line
+				// (Not when it reaches the first line)
 				if (currentLine == this.map.length - 1){this.lapNumber++;}
 			}
 			else {
@@ -329,7 +336,7 @@ public class NavigationAT implements INavigation{
 			yResult = yMap;
 		}
 		
-		// Correction of angle
+		// Correction of angle using SideDistanceSensors
 		
 		// If both line sensors are on white (going straight)
 		if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
