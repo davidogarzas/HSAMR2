@@ -35,6 +35,7 @@ public class NavigationAT implements INavigation{
 	// Custom Variables
 	int currentLine = 0;
 	int lapNumber = 0;
+	int lapNumber2 = 0;
 	double currentLineAngle = 0;
 	double nextLineAngle = 0;
 	double lastAngleResult = 0;
@@ -304,12 +305,13 @@ public class NavigationAT implements INavigation{
 			if (currentLine < this.map.length - 1){
 				currentLine++;
 				
-				// Increases lap number when it is on the last line
-				// (Not when it reaches the first line)
-				if (currentLine == this.map.length - 1){this.lapNumber++;}
+				// Increases lap number when it arrives on the last line (for nextLineAngle calculation)
+				if (currentLine == this.map.length - 1){this.lapNumber++;}				
 			}
 			else {
+				// Increases lap number when it is on the first line (for Coordinates calculation)
 				currentLine = 0;
+				this.lapNumber2++;
 			}
 			
 			// Saves Current Line Angle
@@ -324,20 +326,27 @@ public class NavigationAT implements INavigation{
 			this.nextLineAngle = this.nextLineAngle + 360*this.lapNumber;
 			
 			// Gets X Y from Map Coordinates
-			xMap = this.map[currentLine].getX1() / 100;  // Turns to cm
-			yMap = this.map[currentLine].getY1() / 100;  // Turns to cm
+			xMap = this.map[currentLine].getX1();
+			yMap = this.map[currentLine].getY1();
+			
+			// Considers the turning radius of robot
+			if (this.currentLineAngle == 0 + 360*this.lapNumber2) {xMap += 5;}
+			else if (this.currentLineAngle == 90 + 360*this.lapNumber2) {yMap += 5;}
+			else if (this.currentLineAngle == 180 + 360*this.lapNumber2) {xMap -= 5;}
+			else if (this.currentLineAngle == 270 + 360*this.lapNumber2) {yMap -= 5;}
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
 			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
-			monitor.writeNavigationComment("Map X: " + String.valueOf(this.map[currentLine].getX1()) + " Y: " + String.valueOf(this.map[currentLine].getY1()));
+			monitor.writeNavigationComment("Map X: " + String.valueOf(xMap) + " Y: " + String.valueOf(yMap));
 			monitor.writeNavigationComment("Next Line Angle: " + this.nextLineAngle);
 			monitor.writeNavigationComment("Current Line Angle: " + this.currentLineAngle);
-			monitor.writeNavigationComment("");
+			monitor.writeNavigationComment("Lap: " + this.lapNumber2);
+			monitor.writeNavigationComment(" ");
 			
 			// Updates X Y to Map Coordinates
-			xResult = xMap;
-			yResult = yMap;
+			xResult = xMap / 100;
+			yResult = yMap / 100;
 		}
 		
 		// Correction of angle using SideDistanceSensors
@@ -346,7 +355,7 @@ public class NavigationAT implements INavigation{
 		if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
 			
 			// If sensors are measuring something
-			if (this.frontSideSensorDistance != 30 && this.backSideSensorDistance != 30){
+			if (this.frontSideSensorDistance < 25 && this.backSideSensorDistance < 25){
 				
 				// If sensors are parallel to wall (Measure same distance)
 				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0){
