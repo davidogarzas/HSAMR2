@@ -40,7 +40,7 @@ public class NavigationAT implements INavigation{
 	double lastAngleResult = 0;
 	boolean initialize = false;
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
-	int timesParallel = 0;
+	int parallelCounter = 0;
 	
 	// For parkingSlots
 	float beginX = 0;
@@ -342,27 +342,27 @@ public class NavigationAT implements INavigation{
 				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0){
 					
 					// If they have measured the same distance at least 3 times
-					if (this.timesParallel < 3){timesParallel++;}	
-					else if (this.timesParallel >= 3){
+					if (this.parallelCounter < 3){this.parallelCounter++;}	
+					else if (this.parallelCounter >= 3){
 						
 						// Corrects angle
-						this.timesParallel = 0;
+						this.parallelCounter = 0;
 						
 						// For printing in degrees
 						angleResultSensors = this.currentLineAngle;
 
 						// If angle difference is big enough
 						if (Math.abs(angleResultSensors - angleResult) >= 5){
-							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult)
-								+ " to: " + String.valueOf(angleResultSensors));
 							
 							// Updates angleResult
+							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult)
+														+ " to: " + String.valueOf(angleResultSensors));
 							angleResult = angleResultSensors;
 						}
 					}
 				
 				// Resets counter if they have not been consecutive equal measurements
-				} else {this.timesParallel = 0;}	
+				} else {this.parallelCounter = 0;}	
 			}
 		}
 	
