@@ -170,9 +170,10 @@ public class NavigationAT implements INavigation{
 		// INIT MAP
 		setMap(GuidanceAT.map);
 		this.currentLineAngle = 0;
-		// this.nextLineAngleDegrees = Math.toDegrees(this.map[1].getP1().angleTo(this.map[1].getP2()));
-		this.nextLineAngle = Math.toDegrees(Math.atan2(map[1].getY2()-map[1].getY1(), map[1].getX2()-map[1].getX1()));
 		
+		
+		this.nextLineAngle = this.map[1].getP1().angleTo(this.map[1].getP2());
+				
 		navThread.setPriority(Thread.MAX_PRIORITY - 1);
 		navThread.setDaemon(true); 
 		// background thread that is not need to terminate in order for the user program to terminate
@@ -207,7 +208,6 @@ public class NavigationAT implements INavigation{
 		if (this.parkingSlotDetectionIsOn)
 				this.detectParkingSlot();
 	}
-	
 	
 	// Outputs
 	
@@ -309,8 +309,8 @@ public class NavigationAT implements INavigation{
 			this.currentLineAngle = this.nextLineAngle;
 			
 			// Calculates Next Line Angle
-			if (currentLine == this.map.length - 1){this.nextLineAngle = Math.toDegrees(Math.atan2(map[0].getY2()-map[0].getY1(), map[0].getX2()-map[0].getX1()));} 
-			else {this.nextLineAngle = Math.toDegrees(Math.atan2(map[currentLine+1].getY2()-map[currentLine+1].getY1(), map[currentLine+1].getX2()-map[currentLine+1].getX1()));}
+			if (currentLine == this.map.length - 1){this.nextLineAngle = this.map[0].getP1().angleTo(this.map[0].getP2());} 
+			else {this.nextLineAngle = this.map[currentLine+1].getP1().angleTo(this.map[currentLine+1].getP2());}
 			
 			// Turns all angles positive and can go above 360°
 			if (this.nextLineAngle < 0){this.nextLineAngle += 360;}
