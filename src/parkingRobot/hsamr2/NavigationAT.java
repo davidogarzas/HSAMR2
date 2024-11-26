@@ -36,9 +36,7 @@ public class NavigationAT implements INavigation{
 	int currentLine = 0;
 	int lapNumber = 0;
 	double currentLineAngle = 0;
-	double currentLineAngleDegrees = 0;
 	double nextLineAngle = 0;
-	double nextLineAngleDegrees = 0;
 	double lastAngleResult = 0;
 	boolean initialize = false;
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
@@ -171,9 +169,9 @@ public class NavigationAT implements INavigation{
 		
 		// INIT MAP
 		setMap(GuidanceAT.map);
-		this.currentLineAngleDegrees = 0;
+		this.currentLineAngle = 0;
 		// this.nextLineAngleDegrees = Math.toDegrees(this.map[1].getP1().angleTo(this.map[1].getP2()));
-		this.nextLineAngleDegrees = Math.toDegrees(Math.atan2(map[1].getY2()-map[1].getY1(), map[1].getX2()-map[1].getX1()));
+		this.nextLineAngle = Math.toDegrees(Math.atan2(map[1].getY2()-map[1].getY1(), map[1].getX2()-map[1].getX1()));
 		
 		navThread.setPriority(Thread.MAX_PRIORITY - 1);
 		navThread.setDaemon(true); 
@@ -272,11 +270,8 @@ public class NavigationAT implements INavigation{
 		double xMap			= 0;
 		double yMap			= 0;
 		
-		double angleResult 	= 0;
-		double angleResultDegrees = 0;
-		
+		double angleResult 	= 0;	
 		double angleResultSensors = 0;
-		double angleResultSensorsDegrees = 0;
 				
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
@@ -294,14 +289,11 @@ public class NavigationAT implements INavigation{
 		
 			xResult 		= Math.cos(w * deltaT) * (this.pose.getX()-ICCx) - Math.sin(w * deltaT) * (this.pose.getY() - ICCy) + ICCx;
 			yResult 		= Math.sin(w * deltaT) * (this.pose.getX()-ICCx) + Math.cos(w * deltaT) * (this.pose.getY() - ICCy) + ICCy;
-			angleResult 	= this.pose.getHeading() + w * deltaT;
+			angleResult 	= Math.toDegrees(this.pose.getHeading() + w * deltaT);
 		}
-		
-		// Turns Angle to Degrees
-		angleResultDegrees = Math.toDegrees(angleResult);
-		
+				
 		// Detects change of line (may change method of detection)
-		if (Math.abs(angleResultDegrees - this.nextLineAngleDegrees) <= 20){
+		if (Math.abs(angleResult - this.nextLineAngle) <= 20){
 			
 			// Updates Current Line Index
 			// Resets line number when finishing the lap
@@ -315,30 +307,23 @@ public class NavigationAT implements INavigation{
 			
 			// Saves Current Line Angle
 			this.currentLineAngle = this.nextLineAngle;
-			this.currentLineAngleDegrees = this.nextLineAngleDegrees;
 			
 			// Calculates Next Line Angle
-			if (currentLine == this.map.length - 1){this.nextLineAngle = Math.atan2(map[0].getY2()-map[0].getY1(), map[0].getX2()-map[0].getX1());} 
-			else {this.nextLineAngle = Math.atan2(map[currentLine+1].getY2()-map[currentLine+1].getY1(), map[currentLine+1].getX2()-map[currentLine+1].getX1());}
-			
-			nextLineAngleDegrees = Math.toDegrees(nextLineAngle);
+			if (currentLine == this.map.length - 1){this.nextLineAngle = Math.toDegrees(Math.atan2(map[0].getY2()-map[0].getY1(), map[0].getX2()-map[0].getX1()));} 
+			else {this.nextLineAngle = Math.toDegrees(Math.atan2(map[currentLine+1].getY2()-map[currentLine+1].getY1(), map[currentLine+1].getX2()-map[currentLine+1].getX1()));}
 			
 			// Turns all angles positive and can go above 360°
-			if (this.nextLineAngle < 0){this.nextLineAngle += 2*Math.PI;}
-			nextLineAngle = nextLineAngle + 2*Math.PI*this.lapNumber;
-			
-			// Turns all angles positive and can go above 360°
-			if (this.nextLineAngleDegrees < 0){this.nextLineAngleDegrees += 360;}
-			nextLineAngleDegrees = nextLineAngleDegrees + 360*this.lapNumber;
+			if (this.nextLineAngle < 0){this.nextLineAngle += 360;}
+			this.nextLineAngle = this.nextLineAngle + 360*this.lapNumber;
 			
 			// Gets X Y from Map Coordinates
-			xMap = this.map[currentLine].getX1() / 100;
-			yMap = this.map[currentLine].getY1() / 100;
+			xMap = this.map[currentLine].getX1() / 100;  // Turns to cm
+			yMap = this.map[currentLine].getY1() / 100;  // Turns to cm
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
 			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
-			monitor.writeNavigationComment("Map X: " + String.valueOf(map[currentLine].getX1()) + " Y: " + String.valueOf(map[currentLine].getY1()));
+			monitor.writeNavigationComment("Map X: " + String.valueOf(this.map[currentLine].getX1()) + " Y: " + String.valueOf(this.map[currentLine].getY1()));
 			
 			// Updates X Y to Map Coordinates
 			xResult = xMap;
@@ -365,14 +350,11 @@ public class NavigationAT implements INavigation{
 						
 						// For printing in degrees
 						angleResultSensors = this.currentLineAngle;
-						angleResultSensorsDegrees = this.currentLineAngleDegrees;
 
 						// If angle difference is big enough
-						if (Math.abs(angleResultSensorsDegrees - angleResultDegrees) >= 5){
-							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResultDegrees)
-								+ " to: " + String.valueOf(angleResultSensorsDegrees));
-							monitor.writeNavigationComment("(Radians) Corrected Angle from: " + String.valueOf(angleResult)
-									+ " to: " + String.valueOf(angleResultSensors));
+						if (Math.abs(angleResultSensors - angleResult) >= 5){
+							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult)
+								+ " to: " + String.valueOf(angleResultSensors));
 							
 							// Updates angleResult
 							angleResult = angleResultSensors;
@@ -387,8 +369,8 @@ public class NavigationAT implements INavigation{
 		// MONITOR (example)
 		monitor.writeNavigationVar("X", "" + (xResult * 100));
 		monitor.writeNavigationVar("Y", "" + (yResult * 100));
-		monitor.writeNavigationVar("Phi", "" + angleResultDegrees);	
-		monitor.writeNavigationVar("PhiError", "" + (angleResultDegrees - this.currentLineAngle));	
+		monitor.writeNavigationVar("Phi", "" + angleResult);	
+		monitor.writeNavigationVar("PhiError", "" + (angleResult - this.currentLineAngle));	
 		
 		this.pose.setLocation((float)xResult, (float)yResult);
 		this.pose.setHeading((float)angleResult);
