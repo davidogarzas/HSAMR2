@@ -256,10 +256,10 @@ public class PerceptionPMP implements IPerception {
 		this.UOdmometry		=	(double)(((sensorBytes[1])<<8) | (sensorBytes[0] & 0xff));
 		this.VOdometry		=	(double)(((sensorBytes[3])<<8) | (sensorBytes[2] & 0xff));
 		this.OdometryT		=   (int)((readBuffer[5]<<8) | (readBuffer[4] & 0xff));
-		this.FrontSensorDistance		=	(double)(((sensorBytes[7] & 0xff)<<8) | (sensorBytes[6] & 0xff)); 
-		this.FrontSideSensorDistance	=	(double)(((sensorBytes[9] & 0xff)<<8) | (sensorBytes[8] & 0xff)) - 3 + 1; // Iguala fisicamente sensor backside, mide 1 de menos
+		this.FrontSensorDistance		=	(double)(((sensorBytes[7] & 0xff)<<8) | (sensorBytes[6] & 0xff));
+		this.FrontSideSensorDistance	=	(double)(((sensorBytes[9] & 0xff)<<8) | (sensorBytes[8] & 0xff));
 		this.BackSensorDistance		=		(double)(((sensorBytes[11] & 0xff)<<8) | (sensorBytes[10] & 0xff));
-		this.BackSideSensorDistance	=		(double)(((sensorBytes[13] & 0xff)<<8) | (sensorBytes[12] & 0xff)) + 1;	// Mide 1 de menos	
+		this.BackSideSensorDistance	=		(double)(((sensorBytes[13] & 0xff)<<8) | (sensorBytes[12] & 0xff));		
 
 		this.controlOdo.addShift(this.UOdmometry,this.VOdometry,this.OdometryT);
 		this.navigationOdo.addShift(this.UOdmometry,this.VOdometry,this.OdometryT);
