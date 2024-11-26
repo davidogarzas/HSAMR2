@@ -290,8 +290,9 @@ public class NavigationAT implements INavigation{
 		
 			xResult 		= Math.cos(w * deltaT) * (this.pose.getX()-ICCx) - Math.sin(w * deltaT) * (this.pose.getY() - ICCy) + ICCx;
 			yResult 		= Math.sin(w * deltaT) * (this.pose.getX()-ICCx) + Math.cos(w * deltaT) * (this.pose.getY() - ICCy) + ICCy;
-			angleResult 	= Math.toDegrees(this.pose.getHeading() + w * deltaT);
+			angleResult 	= this.pose.getHeading() + w * deltaT;
 		}
+		angleResult = Math.toDegrees(angleResult);
 		
 		// Correction of XY Coordinates according to Map
 		
@@ -330,6 +331,9 @@ public class NavigationAT implements INavigation{
 			monitor.writeNavigationComment("Now on Line " + currentLine);
 			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
 			monitor.writeNavigationComment("Map X: " + String.valueOf(this.map[currentLine].getX1()) + " Y: " + String.valueOf(this.map[currentLine].getY1()));
+			monitor.writeNavigationComment("Next Line Angle: " + this.nextLineAngle);
+			monitor.writeNavigationComment("Current Line Angle: " + this.currentLineAngle);
+			monitor.writeNavigationComment("");
 			
 			// Updates X Y to Map Coordinates
 			xResult = xMap;
