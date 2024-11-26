@@ -375,7 +375,7 @@ public class NavigationAT implements INavigation{
 		monitor.writeNavigationVar("PhiError", "" + (angleResult - this.currentLineAngle));	
 		
 		this.pose.setLocation((float)xResult, (float)yResult);
-		this.pose.setHeading((float)angleResult);
+		this.pose.setHeading((float)(angleResult*Math.PI/180));
 		
 	}
 
