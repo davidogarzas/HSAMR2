@@ -317,7 +317,7 @@ public class NavigationAT implements INavigation{
 		*/
 		
 		// Detects change of line (may change method of detection)
-		if (Math.abs(angleResultDegrees - this.nextLineAngleDegrees) <= 20){
+		if (Math.abs(angleResultDegrees - this.nextLineAngleDegrees) <= 2){
 			
 			// Updates Current Line Index
 			// Resets line number when finishing the lap
