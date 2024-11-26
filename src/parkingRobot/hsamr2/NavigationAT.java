@@ -271,7 +271,6 @@ public class NavigationAT implements INavigation{
 		double yMap			= 0;
 		
 		double angleResult 	= 0;	
-		double angleResultSensors = 0;
 				
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
@@ -345,19 +344,15 @@ public class NavigationAT implements INavigation{
 					if (this.parallelCounter < 3){this.parallelCounter++;}	
 					else if (this.parallelCounter >= 3){
 						
-						// Corrects angle
+						// Resets counter
 						this.parallelCounter = 0;
-						
-						// For printing in degrees
-						angleResultSensors = this.currentLineAngle;
 
-						// If angle difference is big enough
-						if (Math.abs(angleResultSensors - angleResult) >= 5){
+						// If angle error is big enough
+						if (Math.abs(this.currentLineAngle - angleResult) >= 5){
 							
 							// Updates angleResult
-							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult)
-														+ " to: " + String.valueOf(angleResultSensors));
-							angleResult = angleResultSensors;
+							monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult) + " to: " + String.valueOf(this.currentLineAngle));
+							angleResult = this.currentLineAngle;
 						}
 					}
 				
