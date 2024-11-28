@@ -43,6 +43,7 @@ public class NavigationAT implements INavigation{
 	boolean initialize = false;
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
 	int parallelCounter = 0;
+	int distanceCounter = 0;
 	
 	// For parkingSlots
 	float beginX = 0;
@@ -138,7 +139,7 @@ public class NavigationAT implements INavigation{
 	/**
 	 * indicates if parking slot detection should be switched on (true) or off (false)
 	 */
-	boolean parkingSlotDetectionIsOn		= true;
+	boolean parkingSlotDetectionIsOn		= false;
 	/**
 	 * pose class containing bundled current X and Y location and corresponding heading angle phi
 	 */
@@ -244,10 +245,10 @@ public class NavigationAT implements INavigation{
 
 		this.mouseOdoMeasurement	= this.mouseodo.getOdoMeasurement();
 
-		this.frontSensorDistance	= perception.getFrontSensorDistance();
-		this.frontSideSensorDistance = perception.getFrontSideSensorDistance();
-		this.backSensorDistance		= perception.getBackSensorDistance();
-		this.backSideSensorDistance	= perception.getBackSideSensorDistance();
+		this.frontSensorDistance	= perception.getFrontSensorDistance()/10;
+		this.frontSideSensorDistance = perception.getFrontSideSensorDistance()/10;
+		this.backSensorDistance		= perception.getBackSensorDistance()/10;
+		this.backSideSensorDistance	= perception.getBackSideSensorDistance()/10;
 	}		 	
 	
 	/**
@@ -361,7 +362,7 @@ public class NavigationAT implements INavigation{
 			if (this.frontSideSensorDistance < 25 && this.backSideSensorDistance < 25){
 				
 				// If sensors are parallel to wall (Measure same distance)
-				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0){
+				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1){
 					
 					// If they have measured the same distance at least 3 times
 					if (this.parallelCounter < 3){this.parallelCounter++;}	
@@ -379,10 +380,10 @@ public class NavigationAT implements INavigation{
 						}
 					}
 				
-				// Resets counter if they have not been consecutive equal measurements
+				// Resets counter if they have not been consecutive equal measurements in the correct conditions
 				} else {this.parallelCounter = 0;}	
-			}
-		}
+			} else {this.parallelCounter = 0;}
+		} else {this.parallelCounter = 0;}
 	
 		// MONITOR (example)
 		monitor.writeNavigationVar("X", "" + (xResult * 100));
@@ -406,17 +407,15 @@ public class NavigationAT implements INavigation{
 		
 		// state 0 = Looking for Possible Slot
 		// state 1 = May have found possible slot
-
 		// Looking for Possible Slot
 		if (this.state == 0){
 			if (this.frontSideSensorDistance >= this.limitDistanceSensors){
 				
+				this.distanceCounter = 0;
 				this.state = 1;
 				
 				// Saves Back Coordinates of Parking Slot
 				this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY());
-				monitor.writeNavigationComment("May have found Slot");
-				monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
 			}
 				
 		// May Have Found Possible Slot State
@@ -424,42 +423,44 @@ public class NavigationAT implements INavigation{
 			
 			// Did not find possibleParkingSlot
 			// Did not cover enough distance before FrontSideSensor stopped detecting enough depth for robot
-			if (this.pose.distanceTo(this.parkingSlotBegin)*100 < this.sizeRobot 
-				&& this.frontSideSensorDistance <= this.limitDistanceSensors){
+			if (this.pose.distanceTo(this.parkingSlotBegin)*100 < this.sizeRobot){
+				if (this.frontSideSensorDistance <= this.limitDistanceSensors){
 				
-				// Saves Front Coordinates of NonParkingSlot
-				this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
-				
-				monitor.writeNavigationComment("Slot not possible");
-				monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
-				monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " Y: " + this.parkingSlotEnd.getY()*100);
-				monitor.writeNavigationComment("Distance Covered: " + this.pose.distanceTo(this.parkingSlotBegin)*100);
-
-				this.state = 0;
-				
-				// Look through array, see if first coordinate was saved and update slot
-				if (!this.parkingSlotsList.isEmpty()){
-					
-					// Check existing array
-					for (int i = 0; i < this.parkingSlotsList.size(); i++) {
+					// Ensures it wasnt a bad reading
+					if (this.distanceCounter < 5){this.distanceCounter++;}
+					else if (this.distanceCounter >= 5) {
+											
+						// Saves Front Coordinates of NonParkingSlot
+						this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
 						
-						monitor.writeNavigationComment("ID: " + this.parkingSlotsList.get(i).getID());
-						monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
-						monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
+						monitor.writeNavigationComment("Slot not possible");
+						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
+						monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " Y: " + this.parkingSlotEnd.getY()*100);
+						monitor.writeNavigationComment("Distance Covered: " + this.pose.distanceTo(this.parkingSlotBegin)*100);
+		
+						this.state = 0;
 						
-						// Parking Slot already exists
-						if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 5){	
+						// Look through array, see if first coordinate was saved and update slot
+						if (!this.parkingSlotsList.isEmpty()){
 							
-							// Update parking slot
-							
-							this.parkingSlotsList.get(i).setFrontBoundaryPosition(this.parkingSlotEnd.clone());
-							this.parkingSlotsList.get(i).setStatus(ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING);
-
-							monitor.writeNavigationComment("Changed Slot " + this.parkingSlotsList.get(i).getID());
-							monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
-							monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
-				
-							break;
+							// Check existing array
+							for (int i = 0; i < this.parkingSlotsList.size(); i++) {
+								
+								// Parking Slot already exists
+								if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 5){	
+									
+									// Update parking slot
+									
+									this.parkingSlotsList.get(i).setFrontBoundaryPosition(this.parkingSlotEnd.clone());
+									this.parkingSlotsList.get(i).setStatus(ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING);
+		
+									monitor.writeNavigationComment("Changed Slot " + this.parkingSlotsList.get(i).getID());
+									monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
+									monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
+						
+									break;
+								}
+							}
 						}
 					}
 				}
@@ -475,17 +476,9 @@ public class NavigationAT implements INavigation{
 				// Saves Front Coordinates of ParkingSlot
 				this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
 				
-				monitor.writeNavigationComment("Found Slot");
-				monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
-				monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " Y: " + this.parkingSlotEnd.getY()*100);
-				
 				if (!this.parkingSlotsList.isEmpty()){
 					// Check existing array
 					for (int i = 0; i < this.parkingSlotsList.size(); i++) {
-						
-						monitor.writeNavigationComment("ID: " + this.parkingSlotsList.get(i).getID());
-						monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
-						monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
 						
 						// Parking Slot already exists
 						if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < 5
