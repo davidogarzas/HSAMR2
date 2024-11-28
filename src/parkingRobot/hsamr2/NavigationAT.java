@@ -54,7 +54,7 @@ public class NavigationAT implements INavigation{
 	float finalY = 0;
 	int state = 0;
 	double sizeRobot = 25; // Check size
-	int limitDistanceSensors = 20;
+	int limitDistanceSensors = 15;
 	int parkingSlotID = 0;
 	
 	/**
@@ -139,7 +139,7 @@ public class NavigationAT implements INavigation{
 	/**
 	 * indicates if parking slot detection should be switched on (true) or off (false)
 	 */
-	boolean parkingSlotDetectionIsOn		= false;
+	boolean parkingSlotDetectionIsOn		= true;
 	/**
 	 * pose class containing bundled current X and Y location and corresponding heading angle phi
 	 */
@@ -427,8 +427,8 @@ public class NavigationAT implements INavigation{
 				if (this.frontSideSensorDistance <= this.limitDistanceSensors){
 				
 					// Ensures it wasnt a bad reading
-					if (this.distanceCounter < 5){this.distanceCounter++;}
-					else if (this.distanceCounter >= 5) {
+					if (this.distanceCounter < 3){this.distanceCounter++;}
+					else if (this.distanceCounter >= 3) {
 											
 						// Saves Front Coordinates of NonParkingSlot
 						this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
@@ -447,7 +447,7 @@ public class NavigationAT implements INavigation{
 							for (int i = 0; i < this.parkingSlotsList.size(); i++) {
 								
 								// Parking Slot already exists
-								if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 5){	
+								if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 10){	
 									
 									// Update parking slot
 									
@@ -465,48 +465,52 @@ public class NavigationAT implements INavigation{
 					}
 				}
 			}
-			
-			// Found possible parkingSlot
-			// Covered enough distance in X or Y while frontSideSensor detected enough depth
-			else if (this.pose.distanceTo(this.parkingSlotBegin)*100 >= this.sizeRobot 
-					&& this.frontSideSensorDistance >= this.limitDistanceSensors){
+			// Has covered RobotSize
+			else if (this.pose.distanceTo(this.parkingSlotBegin)*100 >= this.sizeRobot){ 
 				
-				this.state = 0;
+				// Robot overreached distance and didnt capture slot (because of distanceCounter)
+				if (this.frontSideSensorDistance < this.limitDistanceSensors){state = 0;}
 				
-				// Saves Front Coordinates of ParkingSlot
-				this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
-				
-				if (!this.parkingSlotsList.isEmpty()){
-					// Check existing array
-					for (int i = 0; i < this.parkingSlotsList.size(); i++) {
-						
-						// Parking Slot already exists
-						if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < 5
-							&& this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 5){	
-							// Update parking slot
-							monitor.writeNavigationComment("Parking Slot Exists");
-							monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
-							monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
-							newSlot = false;
-							break;
+				// Robot reached RobotSize and sensor still measures depth
+				else if (this.frontSideSensorDistance >= this.limitDistanceSensors){
+					
+					this.state = 0;
+					
+					// Saves Front Coordinates of ParkingSlot
+					this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
+					
+					if (!this.parkingSlotsList.isEmpty()){
+						// Check existing array
+						for (int i = 0; i < this.parkingSlotsList.size(); i++) {
+							
+							// Parking Slot already exists
+							if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < 10
+								&& this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 10){	
+								// Update parking slot
+								monitor.writeNavigationComment("Parking Slot Exists");
+								monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
+								monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
+								newSlot = false;
+								break;
+							}
 						}
 					}
-				}
-				
-				// If Parking Slot didnt already exist
-				if (newSlot){
-					this.parkingSlotID++;
-					this.parkingSlotsList.add(
-							new ParkingSlot(
-									this.parkingSlotID, 
-									this.parkingSlotBegin.clone(), 
-									this.parkingSlotEnd.clone(), 
-									ParkingSlotStatus.SUITABLE_FOR_PARKING, 
-									10)
-							);
-					monitor.writeNavigationComment("Added New Slot");
-					monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
-					monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
+					
+					// If Parking Slot didnt already exist
+					if (newSlot){
+						this.parkingSlotID++;
+						this.parkingSlotsList.add(
+								new ParkingSlot(
+										this.parkingSlotID, 
+										this.parkingSlotBegin.clone(), 
+										this.parkingSlotEnd.clone(), 
+										ParkingSlotStatus.SUITABLE_FOR_PARKING, 
+										10)
+								);
+						monitor.writeNavigationComment("Added New Slot");
+						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
+						monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
+					}
 				}
 			}
 		}
