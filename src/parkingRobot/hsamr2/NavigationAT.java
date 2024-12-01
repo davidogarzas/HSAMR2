@@ -296,6 +296,8 @@ public class NavigationAT implements INavigation{
 			yResult 		= Math.sin(w * deltaT) * (this.pose.getX()-ICCx) + Math.cos(w * deltaT) * (this.pose.getY() - ICCy) + ICCy;
 			angleResult 	= this.pose.getHeading() + w * deltaT;
 		}
+		
+		// Turns angle to degrees
 		angleResult = Math.toDegrees(angleResult);
 		
 		// Correction of XY Coordinates according to Map
@@ -329,8 +331,8 @@ public class NavigationAT implements INavigation{
 			this.nextLineAngle = this.nextLineAngle + 360*this.lapNumber;
 			
 			// Gets X Y from Map Coordinates
-			xMap = this.map[currentLine].getX1();
-			yMap = this.map[currentLine].getY1();
+			xMap = this.map[currentLine].getX1();  // cm
+			yMap = this.map[currentLine].getY1();  // cm
 			
 			// Considers the turning radius of robot
 			if (this.currentLineAngle == 0 + 360*this.lapNumber2) {xMap += 5;}
@@ -341,16 +343,15 @@ public class NavigationAT implements INavigation{
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
+			monitor.writeNavigationComment("Lap: " + this.lapNumber2);
 			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
 			monitor.writeNavigationComment("Map X: " + String.valueOf(xMap) + " Y: " + String.valueOf(yMap));
-			monitor.writeNavigationComment("Next Line Angle: " + this.nextLineAngle);
 			monitor.writeNavigationComment("Current Line Angle: " + this.currentLineAngle);
-			monitor.writeNavigationComment("Lap: " + this.lapNumber2);
-			monitor.writeNavigationComment(" ");
+			monitor.writeNavigationComment("Next Line Angle: " + this.nextLineAngle);
 			
 			// Updates X Y to Map Coordinates
-			xResult = xMap / 100; // Turns to m
-			yResult = yMap / 100;
+			xResult = xMap / 100; // m
+			yResult = yMap / 100; // m
 		}
 		
 		// Correction of angle using SideDistanceSensors
@@ -359,12 +360,13 @@ public class NavigationAT implements INavigation{
 		if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
 			
 			// If sensors are measuring something
-			if (this.frontSideSensorDistance < 25 && this.backSideSensorDistance < 25){
+			if (this.frontSideSensorDistance < 20 && this.backSideSensorDistance < 20){
 				
-				// If sensors are parallel to wall (Measure same distance)
+				// If sensors are parallel to wall (Measure same distance with error of 1 cm)
 				if  (Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1){
 					
 					// If they have measured the same distance at least 3 times
+					// (Avoids 'lucky' measurements
 					if (this.parallelCounter < 3){this.parallelCounter++;}	
 					else if (this.parallelCounter >= 3){
 						
@@ -407,23 +409,29 @@ public class NavigationAT implements INavigation{
 		
 		// state 0 = Looking for Possible Slot
 		// state 1 = May have found possible slot
+		
 		// Looking for Possible Slot
 		if (this.state == 0){
+			
+			// Sensor detects a possible space
 			if (this.frontSideSensorDistance >= this.limitDistanceSensors){
 				
+				// Resets distanceCounter and goes to next state
 				this.distanceCounter = 0;
 				this.state = 1;
 				
 				// Saves Back Coordinates of Parking Slot
-				this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY());
+				this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY()); // m
 			}
 				
 		// May Have Found Possible Slot State
 		} else if (this.state == 1){
 			
 			// Did not find possibleParkingSlot
-			// Did not cover enough distance before FrontSideSensor stopped detecting enough depth for robot
+			// Has not covered enough distance for robot
 			if (this.pose.distanceTo(this.parkingSlotBegin)*100 < this.sizeRobot){
+				
+				// FrontSide sensor encounters wall
 				if (this.frontSideSensorDistance <= this.limitDistanceSensors){
 				
 					// Ensures it wasnt a bad reading
@@ -431,7 +439,7 @@ public class NavigationAT implements INavigation{
 					else if (this.distanceCounter >= 3) {
 											
 						// Saves Front Coordinates of NonParkingSlot
-						this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY());
+						this.parkingSlotEnd.setLocation(this.pose.getX(),this.pose.getY()); // m
 						
 						monitor.writeNavigationComment("Slot not possible");
 						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
@@ -468,10 +476,11 @@ public class NavigationAT implements INavigation{
 			// Has covered RobotSize
 			else if (this.pose.distanceTo(this.parkingSlotBegin)*100 >= this.sizeRobot){ 
 				
-				// Robot overreached distance and didnt capture slot (because of distanceCounter)
+				// Prevents bug
+				// Robot encountered wall but distanceCounter didnt change to 3 in time and didnt exit state 1
 				if (this.frontSideSensorDistance < this.limitDistanceSensors){state = 0;}
 				
-				// Robot reached RobotSize and sensor still measures depth
+				// FrontSide sensor still measures depth
 				else if (this.frontSideSensorDistance >= this.limitDistanceSensors){
 					
 					this.state = 0;
@@ -483,7 +492,7 @@ public class NavigationAT implements INavigation{
 						// Check existing array
 						for (int i = 0; i < this.parkingSlotsList.size(); i++) {
 							
-							// Parking Slot already exists
+							// Parking Slot already exists (same coordinates)
 							if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < 10
 								&& this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 10){	
 								// Update parking slot
@@ -515,6 +524,6 @@ public class NavigationAT implements INavigation{
 			}
 		}
 		
-		return; // has to be implemented by students
+		return;
 	}
 }
