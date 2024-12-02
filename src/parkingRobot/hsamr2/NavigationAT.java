@@ -166,6 +166,8 @@ public class NavigationAT implements INavigation{
 		this.mouseodo = perception.getNavigationOdo();		
 		
 		// MONITOR VARIABLES
+		monitor.addNavigationVar("Lap");
+		monitor.addNavigationVar("Line");
 		monitor.addNavigationVar("X");
 		monitor.addNavigationVar("Y");
 		monitor.addNavigationVar("Phi");
@@ -385,9 +387,11 @@ public class NavigationAT implements INavigation{
 				// Resets counter if they have not been consecutive equal measurements in the correct conditions
 				} else {this.parallelCounter = 0;}	
 			} else {this.parallelCounter = 0;}
-		} else {this.parallelCounter = 0;}
+		}
 	
 		// MONITOR (example)
+		monitor.writeNavigationVar("Lap", "" + this.lapNumber2);
+		monitor.writeNavigationVar("Line", "" + this.currentLine);
 		monitor.writeNavigationVar("X", "" + (xResult * 100));
 		monitor.writeNavigationVar("Y", "" + (yResult * 100));
 		monitor.writeNavigationVar("Phi", "" + angleResult);	
