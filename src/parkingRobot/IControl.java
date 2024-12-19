@@ -40,7 +40,9 @@ public interface IControl {
 		/**
 		 * NXT in Ruhe versetzen
 		 */
-		INACTIVE
+		INACTIVE,
+		
+		DEMO_PRG1,
 	}
 	
 		

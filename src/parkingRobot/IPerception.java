@@ -4,7 +4,7 @@ package parkingRobot;
  * interface for the main module 'Perception', providing methods for getting all measuring data
  * from the robot sensors
  * 
- * @author PMP
+ * @author PMPs
  */
 public interface IPerception {
 	/**

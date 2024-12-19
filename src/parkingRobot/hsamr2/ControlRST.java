@@ -5,9 +5,8 @@ import lejos.robotics.navigation.Pose;
 import lejos.util.Delay;
 import parkingRobot.IControl;
 import parkingRobot.IMonitor;
-import parkingRobot.IPerception;
+import parkingRobot.IPerception;                 
 import parkingRobot.IPerception.*;
-import lejos.nxt.Motor;
 import lejos.nxt.NXTMotor;
 import parkingRobot.INavigation;
 
@@ -192,13 +191,22 @@ public class ControlRST implements IControl {
 		  					  exec_PARKCTRL_ALGO();
 		  					  break;		  					  
 		  case INACTIVE 	: exec_INACTIVE();
-			                  break;
+			                  break;               
+		  case DEMO_PRG1 	: update_DEMOPRG1_Parameter();
+		                      exec_DEMOPRG1_ALGO();
+		                      break;
 		}
 
 	}
 	
 	// Private methods
-	
+
+
+	private void update_DEMOPRG1_Parameter() {
+
+	}
+
+
 	/**
 	 * update parameters during VW Control Mode
 	 */
@@ -238,58 +246,63 @@ public class ControlRST implements IControl {
     
 	//Aufgabe 3.3
     private void exec_SETPOSE_ALGO() {
-        // Ziel: Implementierung der Regelung für die Geradeausfahrt
+        // Ziel: Implementierung der Regelung fÃ¼r die Geradeausfahrt
         // Zielposition
-        double targetX = 100.0; // Ziel in X-Richtung
+        double targetX = 120.0; // Ziel in X-Richtung
         double targetY = 0.0;   // Ziel in Y-Richtung
 
-        // Regelparameter
-        double v0 = 30.0;  // Zielgeschwindigkeit
-        double kp = 2.0;    // Proportionalverstärker
-        double kd = 1.0;    // Differenzialverstärker
+        // Regelparameter (PID)
+        double v0 = 40.0;   // Zielgeschwindigkeit
+        double kp = 1.0;    // ProportionalverstÃ¤rker
+        double ki = 0.1;    // IntegralverstÃ¤rker
+        double kd = 0.5;    // DifferenzialverstÃ¤rker
 
         // Fehlerinitialisierung
         double lastError = 0.0;
+        double integral = 0.0;
 
         // Schleife zur Regelung der Geradeausfahrt
         while (true) {
             // Aktuelle Pose abrufen
             Pose currentPose = getCurrentPose(); // Methode zur Abfrage der Fahrzeugpose
+            
+            // ÃœberprÃ¼fen, ob Ziel erreicht ist (wenn x 120 erreicht hat)
+            if (currentPose.getX() >= targetX) {
+                break;
+            }
 
             // Aktuelle Querabweichung berechnen
             double error = computeLateralError(currentPose, targetX, targetY);
+            
+            // Integrieren des Fehlers fÃ¼r den Integralanteil
+            integral += error;
 
-            // Differenzialanteil (Änderung des Fehlers)
+            // Differenzialanteil (Ã„nderung des Fehlers)
             double derivative = error - lastError;
 
-            // Regelgröße berechnen
-            double correction = kp * error + kd * derivative;
+            // RegelgrÃ¶ÃŸe berechnen (PID-Formel)
+            double correction = kp * error + ki * integral + kd * derivative;
 
             // Motorengeschwindigkeiten anpassen
             double u1 = v0 + correction; // Geschwindigkeit linkes Rad
             double u2 = v0 - correction; // Geschwindigkeit rechtes Rad
 
             // Setze die Motoren
-            Motor.A.setSpeed((int) Math.max(0, u1)); // Begrenzung auf 0 oder mehr
-            Motor.B.setSpeed((int) Math.max(0, u2));
-            Motor.A.forward();
-            Motor.B.forward();
+            leftMotor.setPower((int) Math.max(0, u1)); // Begrenzung auf 0 oder mehr
+            rightMotor.setPower((int) Math.max(0, u2));
+            leftMotor.forward();
+            rightMotor.forward();
 
             // Fehler aktualisieren
             lastError = error;
 
-            // Abbruchbedingung (optional, z. B. Ziel erreicht oder Taste gedrückt)
-            if (hasReachedTarget(currentPose, targetX, targetY)) {
-                break;
-            }
-
-            // Kleine Pause für Stabilität
+            // Kleine Pause fÃ¼r StabilitÃ¤t
             Delay.msDelay(50);
         }
 
         // Stoppe Motoren nach Abschluss
-        Motor.A.stop();
-        Motor.B.stop();
+        leftMotor.stop();
+        rightMotor.stop();
     }
 
     /**
@@ -311,22 +324,9 @@ public class ControlRST implements IControl {
         // Berechne Querabweichung in lokaler Fahrzeugkoordinate
         return -dy * Math.cos(theta) + dx * Math.sin(theta);
     }
-
-    /**
-     * Überprüft, ob das Fahrzeug das Ziel erreicht hat.
-     * @param pose Aktuelle Pose des Fahrzeugs.
-     * @param targetX Ziel-X-Koordinate.
-     * @param targetY Ziel-Y-Koordinate.
-     * @return true, wenn Ziel erreicht ist.
-     */
-    private boolean hasReachedTarget(Pose pose, double targetX, double targetY) {
-        double distance = Math.sqrt(Math.pow(pose.getX() - targetX, 2) + Math.pow(pose.getY() - targetY, 2));
-        return distance < 5.0; // Schwelle von 5 Einheiten
-    }
-
     /**
      * Beispielmethode zur Abfrage der aktuellen Pose.
-     * Implementierung ist abhängig vom spezifischen Framework (LeJOS, etc.).
+     * Implementierung ist abhÃ¤ngig vom spezifischen Framework (LeJOS, etc.).
      */
     private Pose getCurrentPose() {
         // Beispiel: Die Pose wird hier simuliert oder von einem Sensor gelesen.
@@ -353,145 +353,121 @@ public class ControlRST implements IControl {
 	 * white = 0, black = 2, grey = 1
 	 */
     
-	private void exec_LINECTRL_ALGO(){
-		leftMotor.forward();
-		rightMotor.forward();
-		
-		// PID-Parameter  
-		
-		/*VARIANTE 2 OPTION A
-		
-	    double Kp = 1.0;  // Proportionalfaktor
-	    double Ki = 0.1;  // Integralfaktor
-	    double Kd = 0.5;  // Differenzialfaktor
-	    double dt = 0.5;   //Abtastzeitraum in Sekunden
-
-	    // PID-Zustandsvariablen
-	    double integral = 0.0;     // Akkumulierter Fehler
-	    double lastError = 0.0;    // Fehler der vorherigen Iteration
-
-	    // Lichtintensität von den Sensoren holen (angenommen: Wertebereich 0-100)
-        int lightLeft = perception.getLeftLineSensorValue();
-        int lightRight = perception.getRightLineSensorValue();
-
-        // Fehlerberechnung: Differenz der Lichtintensitäten
-        double error = lightLeft - lightRight;
-
-        // Proportionalanteil
-        double proportional = error;
-
-        // Integralanteil: Fehler akkumulieren
-        integral += error * dt;
-
-        // Differenzialanteil: Änderung des Fehlers
-        double derivative = (error - lastError) / dt;
-
-        // PID-Berechnung
-        double correction = Kp * proportional + Ki * integral + Kd * derivative;
-
-        // Speichern des Fehlers für die nächste Iteration
-        lastError = error;
-
-        // Basisgeschwindigkeit für die Motoren
-        int basePower = 30;
-
-        // Motorleistung berechnen
-        int leftPower = (int) Math.max(0, Math.min(100, basePower - correction));
-        int rightPower = (int) Math.max(0, Math.min(100, basePower + correction));
-
-        // Motorleistung setzen
-        leftMotor.setPower(leftPower);
-        rightMotor.setPower(rightPower);
+    int status = 0;
+    
+    private void exec_DEMOPRG1_ALGO() {
+        leftMotor.forward();
+        rightMotor.forward();
         
-        VARIANTE 2 OPTION A*/
-		
-	    double Kp = 1.0;   // Proportionalfaktor
-	    double Ki = 10.0;  // Integralfaktor
-	    double Kd = 0.5;   // Differenzialfaktor
-	    double dt = 0.5;   //Abtastzeitraum in Sekunden
+        switch (status) {
+            case 0: // Straight drive
+            	move();//drive(0.1, 0); //10 cm/s
+                if (navigation.getPose().getX() * 100 >= 120) { //Strecke 120 cm
+                    stop();
+            	    KpLeft = 1; KiLeft = 0.01; KdLeft = 0.1;
+            		KpRight = 1; KiRight = 0.08; KdRight = 0.12;
+                    status = 1;
+                    break;
+                }
+                break;
 
-	    // Inkrementelle PID-Variablen
-	    double PID1 = Kp * (1 + (dt / Ki) + (Kd / dt)); //Coeficiente asociado al error actual (combinación de términos proporcional, integral y derivativo)
-	    double PID2 = Kp * (-1 - (2 * Kd / dt));  //Coeficiente asociado al error anterior (influencia negativa proporcional y derivativa)
-	    double PID3 = Kp * (Kd / dt); //Coeficiente asociado al error dos pasos atrás (influencia derivativa pura)
+            case 1: // Rotate at 15Â°/s
+                drive(0, 15);
+                if (navigation.getPose().getHeading() * (180 / Math.PI) >= 70) { //Drehung bis 90Â°
+                    stop();
+                	KpLeft = 4; KiLeft = 0.1; KdLeft = 0.1;
+                	KpRight = 4; KiRight = 0.15; KdRight = 0.2;
+                    status = 2;
+                    break;
+                }
+                break;
 
-	    double correction = 0;
-	    double lastCorrection = 0;
-	    double error = 0;
-	    double lastError = 0;
-	    double lastError2 = 0;
+            case 2: // Straight drive
+                drive(0.05, 0); //5 cm/s
+                if (navigation.getPose().getY() * 100 >= 30) { //Strecke 30 cm
+                    stop();
+            	    KpLeft = 0.5; KiLeft = 0.01; KdLeft = 0.1;
+            		KpRight = 0.8; KiRight = 0.08; KdRight = 0.12;
+                    status = 3;
+                }
+                break;
 
-	    // Lichtintensität von den Sensoren holen (angenommen: Wertebereich 0-100)
-	    int lightLeft = perception.getLeftLineSensorValue();
-	    int lightRight = perception.getRightLineSensorValue();
+            case 3: // Rotate at -30Â°/s
+                drive(0, -30);
+                if (navigation.getPose().getHeading() * 180 / Math.PI == -90) { //Drehung bis 90Â°
+                    stop();
+                    status = 5;
+                }
+                break;
 
-	    // Fehlerberechnung: Differenz der Lichtintensitäten
-	    error = lightLeft - lightRight;
+            case 4:
+                exec_LINECTRL_ALGO(); //Linienverfolgung
+                break;
 
-	    //PID-Berechnung
-	    correction = lastCorrection + (PID1 * error) + (PID2 * lastError) + (PID3 * lastError2);
+            default:
+                // Handle unexpected status if necessary
+                break;
+        }
+    }
+    
+    private void move(){
+    	leftMotor.setPower(40);
+        rightMotor.setPower(40);
+    }
 
-	    // Speichern des Wertes für die nächste Iteration
-	    lastError2 = lastError;
-	    lastError = error;
-	    lastCorrection = correction;
-
-	    // Basisgeschwindigkeit für die Motoren
-	    int basePower = 30;
-
-	    // Motorleistung berechnen
-	    int leftPower = (int) Math.max(0, Math.min(100, basePower - correction));
-	    int rightPower = (int) Math.max(0, Math.min(100, basePower + correction));
-
-	    // Motorleistung setzen
-	    leftMotor.setPower(leftPower);
-	    rightMotor.setPower(rightPower);
-
-
-        // MONITOR: Werte ausgeben
-        monitor.writeControlVar("LeftLight", "" + lightLeft);
-        monitor.writeControlVar("RightLight", "" + lightRight);
-        monitor.writeControlVar("RightWheelPower", "" + rightPower);
-        monitor.writeControlVar("LeftWheelPower", "" + leftPower);
-        monitor.writeControlComment("PID Correction: " + correction);
-        monitor.writeControlVar("Error", "" + error);
-        monitor.writeControlComment("Left Line Sensor Value" + perception.getLeftLineSensorValue());
-        monitor.writeControlComment("Right Line Sensor Value" + perception.getRightLineSensorValue());
-
-		/*VARIANTE 1
-		 // Farbwerte: 0 = weiß, 1 = grau, 2 = schwarz
+    
+    private void exec_LINECTRL_ALGO(){
+        leftMotor.forward();
+        rightMotor.forward();
+        
+        // Farbwerte: 0 = weiÃŸ, 1 = grau, 2 = schwarz
         int sensorLeftValue = this.lineSensorLeft;
         int sensorRightValue = this.lineSensorRight;
 
         // Leistungsparameter
         int basePower = 30;  // Basisgeschwindigkeit
         int maxCorrection = 50;  // Maximale Abweichungskorrektur
-        float p = 25;
+        float p = 25;           // Coef. proporcional
+        float i = 0.2f;         // Coef. integral (ajustar segÃºn sea necesario)
+        double d = 0.8;            // Coef. derivativo
 
-        // Berechnung des Fehlers
+        // Variables para el controlador PID
+        int previousError = 0;      // Error anterior
+        int integral = 0;           // Suma acumulada del error
+
+        // Calcular el error
         int error = sensorLeftValue - sensorRightValue;
 
-        // Proportionalsteuerung
-        float correction = error * p;
-
-        // Begrenzung der Korrekturwerte
-        if (correction < -maxCorrection) {correction = -maxCorrection;}
-        else if (correction > maxCorrection) {correction = maxCorrection;}
-
-        // Anpassung der Motorleistung
-        int leftPower = Math.round(basePower - correction);
-        int rightPower = Math.round(basePower + correction);
-
-        // Begrenzung der Motorleistung auf zulässige Werte
-        if (leftPower < -100) {leftPower = -100;}
-        else if (leftPower > 100) {leftPower = 100;}
+        // Calcular la derivada del error (la diferencia entre el error actual y el error anterior)
+        int derivative = error - previousError;
         
-        if (rightPower < -100) {rightPower = -100;}
-        else if (rightPower > 100) {rightPower = 100;}
+        // Calcular el tÃ©rmino integral (suma acumulada del error)
+        integral += error;
+        
+        // Controlador PID
+        double correction = (p * error) + (i * integral) + (d * derivative);
 
-        // Motorleistung setzen
+        // Limitar los valores de correcciÃ³n
+        if (correction < -maxCorrection) { correction = -maxCorrection; }
+        else if (correction > maxCorrection) { correction = maxCorrection; }
+
+        // Ajuste de la potencia del motor
+        int leftPower = (int) Math.round(basePower - correction);
+        int rightPower = (int) Math.round(basePower + correction);
+
+        // Limitar la potencia del motor a los valores permisibles
+        if (leftPower < -100) { leftPower = -100; }
+        else if (leftPower > 100) { leftPower = 100; }
+
+        if (rightPower < -100) { rightPower = -100; }
+        else if (rightPower > 100) { rightPower = 100; }
+
+        // Asignar la potencia a los motores
         leftMotor.setPower(leftPower);
         rightMotor.setPower(rightPower);
+
+        // Guardar el error actual para el cÃ¡lculo de la derivada en la siguiente iteraciÃ³n
+        previousError = error;
 
         // MONITOR
         
@@ -501,78 +477,6 @@ public class ControlRST implements IControl {
 		monitor.writeControlVar("LeftWheelPower", "" + leftPower);
 		monitor.writeControlVar("Correction", "" + correction);
 		monitor.writeControlVar("Error", "" + error);
-		
-		VARIANTE 1*/
-	    
-	     
-
-        /* BEISPIEL CONTROL
-		  
-		int lowPower = 1;
-		int highPower = 45;
-  
-		// MONITOR (example)
-		monitor.writeControlVar("LeftSensor", "" + this.lineSensorLeft);
-		monitor.writeControlVar("RightSensor", "" + this.lineSensorRight);	
-		
-        if(this.lineSensorLeft == 2 && (this.lineSensorRight == 1)){
-			
-			// when left sensor is on the line, turn left
-    	    leftMotor.setPower(lowPower);
-			rightMotor.setPower(highPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn left");
-			
-		} 
-        else if(this.lineSensorRight == 2 && (this.lineSensorLeft == 1)){
-		
-			// when right sensor is on the line, turn right
-			leftMotor.setPower(highPower);
-			rightMotor.setPower(lowPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn right");
-		}
-		else if(this.lineSensorLeft == 2 && (this.lineSensorRight == 0)){
-			
-			// when left sensor is on the line, turn left
-			leftMotor.setPower(lowPower);
-			rightMotor.setPower(highPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn left");
-			
-		} 
-		else if(this.lineSensorRight == 2 && (this.lineSensorLeft == 0)){
-		
-			// when right sensor is on the line, turn right
-			leftMotor.setPower(highPower);
-			rightMotor.setPower(lowPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn right");
-		}
-		else if(this.lineSensorLeft == 1 && this.lineSensorRight == 0) {
-				
-			// when left sensor is on the line, turn left
-			leftMotor.setPower(lowPower);
-			rightMotor.setPower(highPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn left");
-				
-		} 
-		else if(this.lineSensorRight == 1 && this.lineSensorLeft == 0) {
-			
-			// when right sensor is on the line, turn right
-			leftMotor.setPower(highPower);
-			rightMotor.setPower(lowPower);
-			
-			// MONITOR (example)
-			monitor.writeControlComment("turn right");
-		} 
-		BEISPIEL CONTROL */
 	}
 	
 	private void stop(){
@@ -587,33 +491,91 @@ public class ControlRST implements IControl {
      * @param omega angle velocity of the robot
      */
 	
-	//Aufgabe 3.2
+	// Aufgabe 3.2
+	
+	// ParÃ¡metros PID separados para cada rueda
+	double KpLeft = 10, KiLeft = 0.1, KdLeft = 0.1;
+	double KpRight = 30, KiRight = 0.15, KdRight = 0.2;
+
 	private void drive(double v, double omega) {
-	    // Fahrzeugparameter
-	    double wheelRadius = 0.138; // Radius der Räder in Metern
-	    double distanceLength = 0.12; // Abstand zwischen den Rädern in Metern
-	    double pwmScalingFactor = 50; // Experimentell bestimmte Skalierung (z.B. PWM = 50 bei v = 1 m/s)
-	    
-	    // Berechne Radgeschwindigkeiten
-	    double vLeft = v - (omega * distanceLength / 2);
-	    double vRight = v + (omega * distanceLength / 2);
-	    
-	    // Berechne die benötigten PWM-Werte
-	    int powerLeft = (int) (vLeft / wheelRadius * pwmScalingFactor);
-	    int powerRight = (int) (vRight / wheelRadius * pwmScalingFactor);
-	    
-	    // Begrenzen der PWM-Werte auf den Bereich [0, 100]
-	    powerLeft = Math.max(0, Math.min(100, powerLeft));
-	    powerRight = Math.max(0, Math.min(100, powerRight));
-	    
-	    // Setze Motorleistung
+	    // ParÃ¡metros del robot
+	    double wheelRadius = 0.028;    
+	    double distanceLength = 0.138;
+	    double maxIntegral = 20; 
+	    double PWM_SCALE = 1.2;
+
+	    // Variables de control (Integrales y errores anteriores para cada rueda)
+	    double integralLeft = 0, previousErrorLeft = 0;
+	    double integralRight = 0, previousErrorRight = 0;
+
+	    // CÃ¡lculo de las velocidades deseadas de las ruedas
+	    double vLeftDesired = v - (omega * distanceLength / 2.0);
+	    double vRightDesired = v + (omega * distanceLength / 2.0);
+
+	    // Obtener las velocidades actuales de las ruedas
+	    double vLeftActual = getWheelSpeed("left");
+	    double vRightActual = getWheelSpeed("right");
+
+	    // PID para el motor izquierdo
+	    double errorLeft = vLeftDesired - vLeftActual;
+	    integralLeft += errorLeft;
+	    integralLeft = Math.max(-maxIntegral, Math.min(maxIntegral, integralLeft));
+	    double derivativeLeft = errorLeft - previousErrorLeft;
+	    double controlLeft = KpLeft * errorLeft + KiLeft * integralLeft + KdLeft * derivativeLeft;
+	    previousErrorLeft = errorLeft;
+
+	    // PID para el motor derecho
+	    double errorRight = vRightDesired - vRightActual;
+	    integralRight += errorRight;
+	    integralRight = Math.max(-maxIntegral, Math.min(maxIntegral, integralRight));
+	    double derivativeRight = errorRight - previousErrorRight;
+	    double controlRight = KpRight * errorRight + KiRight * integralRight + KdRight * derivativeRight;
+	    previousErrorRight = errorRight;
+
+	    // CÃ¡lculo de los valores PWM
+	    int powerLeft = (int) (controlLeft / wheelRadius * PWM_SCALE);
+	    int powerRight = (int) (controlRight / wheelRadius * PWM_SCALE);
+
+	    // Limitar los valores PWM al rango permitido [-100, 100]
+	    powerLeft = Math.max(-100, (int) (controlLeft / wheelRadius * PWM_SCALE));
+	    powerRight = Math.max(-100, (int) (controlRight / wheelRadius * PWM_SCALE));
+
+	    // Aplicar potencia a los motores
 	    leftMotor.setPower(powerLeft);
 	    rightMotor.setPower(powerRight);
-	    
-	    // MONITOR: Gebe die Werte aus
-	    monitor.writeControlVar("vLeft", "" + vLeft);
-	    monitor.writeControlVar("vRight", "" + vRight);
+
+	    // Monitor para depuraciÃ³n
+	    monitor.writeControlVar("vLeftDesired", "" + vLeftDesired);
+	    monitor.writeControlVar("vRightDesired", "" + vRightDesired);
+	    monitor.writeControlVar("vLeftActual", "" + vLeftActual);
+	    monitor.writeControlVar("vRightActual", "" + vRightActual);
+	    monitor.writeControlVar("ErrorLeft", "" + errorLeft);
+	    monitor.writeControlVar("ErrorRight", "" + errorRight);
 	    monitor.writeControlVar("PowerLeft", "" + powerLeft);
 	    monitor.writeControlVar("PowerRight", "" + powerRight);
 	}
+
+	// MÃ©todo para medir las velocidades simuladas de las ruedas
+	private double getWheelSpeed(String wheel) {
+	    IPerception.AngleDifferenceMeasurement angleMeasurement;
+	    double wheelRadius = 0.028;
+
+	    // SelecciÃ³n del encoder y cÃ¡lculo del radio
+	    if (wheel.equalsIgnoreCase("left")) {
+	        angleMeasurement = navigation.getAngleMeasuremntLeft();
+	    } else if (wheel.equalsIgnoreCase("right")) {
+	        angleMeasurement = navigation.getAngleMeasuremntRight();
+	    } else {
+	        throw new IllegalArgumentException("Rueda no vÃ¡lida: " + wheel);
+	    }
+
+	    // Calcular la velocidad angular en grados por segundo
+	    double angleSpeed = angleMeasurement.getAngleSum() / ((double) angleMeasurement.getDeltaT() / 1000);
+
+	    // Convertir velocidad angular a velocidad lineal (m/s)
+	    double linearSpeed = (angleSpeed * Math.PI * wheelRadius) / 180;
+
+	    return linearSpeed;
+	}
+
 }

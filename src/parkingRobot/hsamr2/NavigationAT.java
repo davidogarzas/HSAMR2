@@ -250,7 +250,13 @@ public class NavigationAT implements INavigation{
 		this.backSensorDistance		= perception.getBackSensorDistance()/10;
 		this.backSideSensorDistance	= perception.getBackSideSensorDistance()/10;
 	}		 	
+	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntLeft(){
+		return this.angleMeasurementLeft;
+	}
 	
+	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntRight(){
+		return this.angleMeasurementRight;
+	}
 	/**
 	 * calculates the robot pose from the measurements
 	 */

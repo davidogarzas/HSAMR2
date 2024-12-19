@@ -54,7 +54,9 @@ public class GuidanceAT {
 		/**
 		 * indicates that shutdown of main program has initiated
 		 */
-		EXIT
+		EXIT, 
+		
+		DEMO1,
 	}
 	
 	
@@ -163,7 +165,43 @@ public class GuidanceAT {
 					if ( currentStatus != CurrentStatus.DRIVING ){
 						//nothing to do here
 					}
-					break;				
+					break;		
+					
+				case DEMO1:
+					// MONITOR (example)
+//					monitor.writeGuidanceComment("Guidance_Driving");
+					
+					//Into action
+					if ( lastStatus != CurrentStatus.DEMO1 ){
+						control.setCtrlMode(ControlMode.DEMO_PRG1);
+					}
+					
+					//While action				
+					{
+						//nothing to do here
+					}					
+					
+					//State transition check
+					lastStatus = currentStatus;
+					if ( hmi.getMode() == parkingRobot.INxtHmi.Mode.PAUSE ){
+						currentStatus = CurrentStatus.INACTIVE;
+					}else if ( Button.ENTER.isDown() ){
+						currentStatus = CurrentStatus.INACTIVE;
+						while(Button.ENTER.isDown()){Thread.sleep(1);} //wait for button release
+					}else if ( Button.ESCAPE.isDown() ){
+						currentStatus = CurrentStatus.EXIT;
+						while(Button.ESCAPE.isDown()){Thread.sleep(1);} //wait for button release
+					}else if (hmi.getMode() == parkingRobot.INxtHmi.Mode.DISCONNECT){
+						currentStatus = CurrentStatus.EXIT;
+					}
+					
+					//Leave action
+					if ( currentStatus != CurrentStatus.DEMO1 ){
+						//nothing to do here
+					}
+					break;			
+					
+					
 				case INACTIVE:
 					//Into action
 					if ( lastStatus != CurrentStatus.INACTIVE ){
@@ -187,6 +225,9 @@ public class GuidanceAT {
 						while(Button.ESCAPE.isDown()){Thread.sleep(1);} //wait for button release
 					}else if (hmi.getMode() == parkingRobot.INxtHmi.Mode.DISCONNECT){
 						currentStatus = CurrentStatus.EXIT;
+					}else if (Button.RIGHT.isDown()  ){
+						currentStatus = CurrentStatus.DEMO1;
+						while(Button.RIGHT.isDown()){Thread.sleep(1);}
 					}
 					
 					//Leave action
