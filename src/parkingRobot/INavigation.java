@@ -15,7 +15,6 @@ import lejos.robotics.navigation.Pose;
  * @author IfA
  */
 public interface INavigation {
-	
 	// Inputs 	
 	
 	/**
@@ -34,7 +33,9 @@ public interface INavigation {
 	 */
 	public void setDetectionState(boolean isOn);
 	
+	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntLeft();
 	
+	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntRight();
 	// Class control
 	
 	/**
