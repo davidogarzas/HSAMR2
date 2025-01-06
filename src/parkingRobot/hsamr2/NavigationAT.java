@@ -33,7 +33,7 @@ import parkingRobot.hsamr2.NavigationThread;
  */
 
 public class NavigationAT implements INavigation{
-	
+		
 	// Custom Variables
 	int currentLine = 0;
 	int lapNumberAngleCalculation = 0;
@@ -46,8 +46,12 @@ public class NavigationAT implements INavigation{
 	int parallelCounter = 0;
 	int distanceCounter = 0;
 	
+	float[] lineAngles = {0,0,0,0,0,0,0,0};
+	
 	double prevAngle = 0;
 	int line_state = 0;
+	int line_state_coords = 0;
+	long ref_time_coords = 0;
 	long ref_time = 0;
 	boolean turn_corner = false;
 	// 0 = both white
@@ -188,7 +192,7 @@ public class NavigationAT implements INavigation{
 		
 		// INIT MAP
 		setMap(GuidanceAT.map);
-		this.currentLineAngle = 0;
+		calculateLineAngles();
 		
 		
 		this.nextLineAngle = this.map[1].getP1().angleTo(this.map[1].getP2());
@@ -255,6 +259,78 @@ public class NavigationAT implements INavigation{
 	
 	// Private methods
 	
+	private void calculateLineAngles(){
+		for (int i=0; i<this.map.length; i++){
+			this.lineAngles[i] = this.map[i].getP1().angleTo(this.map[i].getP2());
+			
+			// Turns all angles positive (from 0° to 360°)
+			if (this.lineAngles[i] < 0){this.lineAngles[i] += 360;}
+		}
+		
+		// Initiates currentLineAngle
+		this.currentLineAngle = this.lineAngles[0];
+
+	}
+	
+	private boolean detectCorner(int method, double angleResult){
+		
+		if (method == 1){
+			// Method 1
+			// Detect corner when the change in angle is big enough while a line sensor detects black
+			if (this.line_state == 0){
+				if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
+					|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
+					this.line_state = 1;
+					this.prevAngle = angleResult;
+				}
+			} 
+			
+			else if (this.line_state == 1){
+				if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
+					this.line_state = 0;
+					if (Math.abs((angleResult - this.prevAngle)) >= 70){
+						this.turn_corner = true; 
+					}
+					this.prevAngle = angleResult;
+				}
+			}
+		}
+		
+		else if (method == 2){
+			// Method 2
+			// Detects corner when a lineSensor has detected black for a certain time period
+			if (this.line_state == 0){
+				if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
+					|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
+					this.line_state = 1;
+					this.ref_time = System.currentTimeMillis();
+				}
+			} 
+			
+			else if (this.line_state == 1){
+				if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
+					this.line_state = 0;
+					if (Math.abs((System.currentTimeMillis() - this.ref_time)) >= 200){
+						this.turn_corner = true; 
+					}
+					this.ref_time = System.currentTimeMillis();
+				}
+			}
+		}
+				
+		else if (method == 3){
+			// Method 3
+			// Detects change of line/ corner turn 
+			// when it is 20° from reaching the desired angle of the next line
+			
+			if (Math.abs(angleResult - this.nextLineAngle) <= 20){
+				this.turn_corner = true;
+			}
+		}
+		
+		return this.turn_corner;		
+	}
+	
 	/**
 	 * calls the perception methods for obtaining actual measurement data and writes 
 	 * the data into members
@@ -298,9 +374,8 @@ public class NavigationAT implements INavigation{
 		
 		double xMap			= 0;
 		double yMap			= 0;
-		
-		double angleResult 	= 0;	
-				
+		double angleResult  = 0;
+						
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
 		
 		// Calculate Odometry with Encoders
@@ -327,89 +402,65 @@ public class NavigationAT implements INavigation{
 		// Turns angle to degrees
 		angleResult = Math.toDegrees(angleResult);
 		
-		// Method 1
-		// Detect corner when the change in angle is big enough while a line sensor detects black
-		if (this.line_state == 0){
-			if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
-				|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
-				this.line_state = 1;
-				this.prevAngle = angleResult;
-			}
-		} 
-		
-		else if (this.line_state == 1){
+		// Updates coordinates according to lineSensors
+		if (line_state_coords == 0){
 			if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
-				this.line_state = 0;
-				if (Math.abs((angleResult - this.prevAngle)) >= 70){
-					this.turn_corner = true; 
+				line_state_coords = 1;
+				ref_time_coords = System.currentTimeMillis();
+			}
+		}
+		
+		else if (line_state_coords == 1){
+			if (this.lineSensorLeft != 0 || this.lineSensorRight != 0){
+				line_state_coords = 0;
+				ref_time_coords = System.currentTimeMillis();
+			} else if (this.lineSensorLeft == 0 && this.lineSensorRight == 0 && Math.abs(System.currentTimeMillis() - ref_time_coords) >= 2000){
+				line_state_coords = 0;
+				ref_time_coords = System.currentTimeMillis();
+				Sound.playTone(260,100); // DO4, 0.5s
+				if (this.map[this.currentLine].getX1() == this.map[this.currentLine].getX2()){
+					xResult = this.map[this.currentLine].getX1()/100; //m
+				} else if (this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2()){
+					yResult = this.map[this.currentLine].getY1()/100;
 				}
-				this.prevAngle = angleResult;
+				angleResult = this.currentLineAngle;
 			}
 		}
-		
-		/*
-		// Method 2
-		// Detects corner when a lineSensor has detected black for a certain time period
-		if (this.line_state == 0){
-			if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
-				|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
-				this.line_state = 1;
-				this.ref_time = System.currentTimeMillis();
-			}
-		} 
-		
-		else if (this.line_state == 1){
-			if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
-				this.line_state = 0;
-				if (Math.abs((System.currentTimeMillis() - this.ref_time)) >= 200){
-					this.turn_corner = true; 
-				}
-				this.ref_time = System.currentTimeMillis();
-			}
-		}
-		
-		*/
-		
-		// Method 3
-		// Detects change of line/ corner turn 
-		// when it is 20° from reaching the desired angle of the next line
-		/*
-		if (Math.abs(angleResult - this.nextLineAngle) <= 20){
-			this.turn_corner = true;
-		}
-		*/
+		// Updates this.turn_corner
+		detectCorner(3, angleResult);
 		
 		// Correction of XY Coordinates according to Map
-		
 		if (this.turn_corner){
 			
 			this.turn_corner = false;
+			
+			// Updates angle of finished line (on next lap, it will need +360°)
+			this.lineAngles[this.currentLine] += 360;
+			
 			// Updates Current Line Index of the Map
 			// Increases counter by one as long as the robot wasn't on the last line
-			if (currentLine < this.map.length - 1){
-				currentLine++;
-				
-				// Increases lapNumberAngleCalculation when it arrives on the last line 
-				// for nextLineAngle calculation of first line (instead of 0° now it will be 360°)
-				if (currentLine == this.map.length - 1){this.lapNumberAngleCalculation++;}				
+			if (this.currentLine < this.map.length - 1){
+				this.currentLine++;
 			}
 			
 			// Resets line number and increases lap number if the robot finished the last line
 			else {
-				currentLine = 0;
+				this.currentLine = 0;
 				this.lapNumber++;
 			}
 			
-			// Saves Current nextLineAngle (now this is the desired angle)
-			this.currentLineAngle = this.nextLineAngle;
+			// Updates Current Line Angle (the angle of the current line)
+			this.currentLineAngle = this.lineAngles[this.currentLine];
 			
-			// Calculates New Next Line Angle (the angle of the next line)
-			if (currentLine == this.map.length - 1){this.nextLineAngle = this.map[0].getP1().angleTo(this.map[0].getP2());} 
-			else {this.nextLineAngle = this.map[currentLine+1].getP1().angleTo(this.map[currentLine+1].getP2());}
+			// Updates Next Line Angle (the angle of the next line)
+			if (this.currentLine < this.map.length - 1){
+				this.nextLineAngle = this.lineAngles[this.currentLine + 1];
+			} 
 			
-			// Turns all angles positive and can go above 360°
-			if (this.nextLineAngle < 0){this.nextLineAngle += 360;}
-			this.nextLineAngle = this.nextLineAngle + 360*this.lapNumberAngleCalculation;
+			else {
+				this.nextLineAngle = this.lineAngles[0];
+			}
+			
 			
 			// Gets X Y from Map Coordinates
 			xMap = this.map[currentLine].getX1();  // cm
@@ -450,7 +501,7 @@ public class NavigationAT implements INavigation{
 			&& this.frontSideSensorDistance > 0 && this.backSideSensorDistance > 0
 			
 			// If both sensors are parallel to wall //mm
-			&& Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0.5
+			&& Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1
 			
 			// If difference between angleResult and currentLineAngle (desired angle) is too big
 			&& Math.abs(this.currentLineAngle - angleResult) >= 5){
@@ -465,7 +516,7 @@ public class NavigationAT implements INavigation{
 
 					
 					// Plays sound
-					Sound.beep();
+					Sound.twoBeeps();
 					
 					// Updates angleResult
 					monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult) + " to: " + String.valueOf(this.currentLineAngle));
