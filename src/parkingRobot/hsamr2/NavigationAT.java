@@ -46,6 +46,13 @@ public class NavigationAT implements INavigation{
 	int parallelCounter = 0;
 	int distanceCounter = 0;
 	
+	double prevAngle = 0;
+	int line_state = 0;
+	long ref_time = 0;
+	boolean turn_corner = false;
+	// 0 = both white
+	// 1 = different
+	
 	// For parkingSlots
 	float measurementQuality = 100;
 	double measurementQualityDistanceFactor = 0.001;
@@ -261,6 +268,7 @@ public class NavigationAT implements INavigation{
 
 		this.mouseOdoMeasurement	= this.mouseodo.getOdoMeasurement();
 
+		// Converts to cm
 		this.frontSensorDistance	= perception.getFrontSensorDistance()/10;
 		this.frontSideSensorDistance = perception.getFrontSideSensorDistance()/10;
 		this.backSensorDistance		= perception.getBackSensorDistance()/10;
@@ -319,12 +327,63 @@ public class NavigationAT implements INavigation{
 		// Turns angle to degrees
 		angleResult = Math.toDegrees(angleResult);
 		
-		// Correction of XY Coordinates according to Map
+		// Method 1
+		// Detect corner when the change in angle is big enough while a line sensor detects black
+		if (this.line_state == 0){
+			if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
+				|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
+				this.line_state = 1;
+				this.prevAngle = angleResult;
+			}
+		} 
 		
+		else if (this.line_state == 1){
+			if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
+				this.line_state = 0;
+				if (Math.abs((angleResult - this.prevAngle)) >= 70){
+					this.turn_corner = true; 
+				}
+				this.prevAngle = angleResult;
+			}
+		}
+		
+		/*
+		// Method 2
+		// Detects corner when a lineSensor has detected black for a certain time period
+		if (this.line_state == 0){
+			if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
+				|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
+				this.line_state = 1;
+				this.ref_time = System.currentTimeMillis();
+			}
+		} 
+		
+		else if (this.line_state == 1){
+			if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
+				this.line_state = 0;
+				if (Math.abs((System.currentTimeMillis() - this.ref_time)) >= 200){
+					this.turn_corner = true; 
+				}
+				this.ref_time = System.currentTimeMillis();
+			}
+		}
+		
+		*/
+		
+		// Method 3
 		// Detects change of line/ corner turn 
 		// when it is 20° from reaching the desired angle of the next line
+		/*
 		if (Math.abs(angleResult - this.nextLineAngle) <= 20){
+			this.turn_corner = true;
+		}
+		*/
+		
+		// Correction of XY Coordinates according to Map
+		
+		if (this.turn_corner){
 			
+			this.turn_corner = false;
 			// Updates Current Line Index of the Map
 			// Increases counter by one as long as the robot wasn't on the last line
 			if (currentLine < this.map.length - 1){
@@ -363,7 +422,7 @@ public class NavigationAT implements INavigation{
 			else if (this.currentLineAngle == 270 + 360*this.lapNumber) {yMap -= 5;}
 			
 			// Plays sound
-			Sound.twoBeeps();
+			Sound.beep();
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
@@ -388,8 +447,9 @@ public class NavigationAT implements INavigation{
 			
 			// if sensors are detecting a wall
 			&& this.frontSideSensorDistance < 20 && this.backSideSensorDistance < 20
+			&& this.frontSideSensorDistance > 0 && this.backSideSensorDistance > 0
 			
-			// If both sensors are parallel to wall
+			// If both sensors are parallel to wall //mm
 			&& Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 0.5
 			
 			// If difference between angleResult and currentLineAngle (desired angle) is too big
@@ -450,7 +510,7 @@ public class NavigationAT implements INavigation{
 				this.state = 1;
 				
 				// Plays sound
-				Sound.playTone(260,100); // DO4, 0.5s
+				// Sound.playTone(260,100); // DO4, 0.5s
 				
 				// Saves Back Coordinate of Parking Slot
 				this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY()); // m
@@ -475,7 +535,7 @@ public class NavigationAT implements INavigation{
 				if (sizeMeasured < this.sizeParkingSpace){
 					
 					// Plays sound
-					Sound.playTone(130,100); // DO3, 0.5s
+					// Sound.playTone(130,100); // DO3, 0.5s
 					
 					monitor.writeNavigationComment("Slot not possible");
 					monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
@@ -541,12 +601,13 @@ public class NavigationAT implements INavigation{
 								);
 						
 						// Plays sound
-						Sound.playTone(520,100); // DO4, 0.5s
+						// Sound.playTone(520,100); // DO4, 0.5s
 						
 						monitor.writeNavigationComment("Added New Slot");
 						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
 						monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
-						monitor.writeNavigationComment("Size Measured: " + sizeMeasured);	
+						monitor.writeNavigationComment("Size Measured: " + sizeMeasured);
+						monitor.writeNavigationComment("Quality: " + Math.round((this.measurementQualityBegin + this.measurementQualityEnd)/2));
 					}
 				}
 			}
