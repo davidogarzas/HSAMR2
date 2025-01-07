@@ -5,8 +5,6 @@ import lejos.nxt.MotorPort;
 import lejos.nxt.NXTMotor;
 import parkingRobot.IControl;
 import parkingRobot.IControl.ControlMode;
-import parkingRobot.hsamr2.GuidanceAT;
-import parkingRobot.hsamr2.GuidanceAT.CurrentStatus;
 import parkingRobot.INxtHmi;
 import parkingRobot.INavigation;
 import parkingRobot.IPerception;
@@ -15,8 +13,6 @@ import parkingRobot.IMonitor;
 import lejos.robotics.navigation.Pose;
 import lejos.geom.Line;
 import lejos.nxt.LCD;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Main Guidance class for the parking robot.
@@ -41,26 +37,20 @@ public class GuidanceAT {
     protected static CurrentStatus currentStatus = CurrentStatus.PAUSE;
     protected static CurrentStatus lastStatus = CurrentStatus.EXIT;
     private static ScoutSubState scoutSubState = ScoutSubState.FOLLOW_LINE;
-    
+
     /**
-	 * one line of the map of the robot course. The course consists of a closed chain of straight lines.
-	 * Thus every next line starts where the last line ends and the last line ends where the first line starts.
-	 * This documentation for line0 hold for all lines.
-	 */
-	static Line line0 = new Line(  0,  0, 180,  0);
-	static Line line1 = new Line(180,  0, 180, 60);
-	static Line line2 = new Line(180, 60, 150, 60);
-	static Line line3 = new Line(150, 60, 150, 30);
-	static Line line4 = new Line(150, 30,  30, 30);
-	static Line line5 = new Line( 30, 30,  30, 60);
-	static Line line6 = new Line( 30, 60,   0, 60);
-	static Line line7 = new Line(  0, 60,   0,  0);
-	/**
-	 * map of the robot course. The course consists of a closed chain of straight lines.
-	 * Thus every next line starts where the last line ends and the last line ends where the first line starts.
-	 * All above defined lines are bundled in this array and to form the course map.
-	 */
-	static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
+     * Defines the map of the robot course.
+     */
+    static Line line0 = new Line(0, 0, 180, 0);
+    static Line line1 = new Line(180, 0, 180, 60);
+    static Line line2 = new Line(180, 60, 150, 60);
+    static Line line3 = new Line(150, 60, 150, 30);
+    static Line line4 = new Line(150, 30, 30, 30);
+    static Line line5 = new Line(30, 30, 30, 60);
+    static Line line6 = new Line(30, 60, 0, 60);
+    static Line line7 = new Line(0, 60, 0, 0);
+
+    static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
 
     private IControl control;
     private INavigation navigation;
@@ -188,43 +178,57 @@ public class GuidanceAT {
     }
 
     private Pose computeParkingTrajectory(Pose currentPose, INavigation.ParkingSlot slot) {
-        float x1 = currentPose.getX();
-        float y1 = currentPose.getY();
-        float theta1 = currentPose.getHeading();
-
         float x2 = (float) slot.getBackBoundaryPosition().getX();
         float y2 = (float) slot.getBackBoundaryPosition().getY();
 
-        float theta2 = (float) Math.PI / 2; // Assuming parking slots are vertical
+        float theta2 = (float) Math.PI / 2;
 
-        // Generate third-degree polynomial path
-        float a0 = x1;
-        float a1 = (x2 - x1);
-        float a2 = 0;
-        float a3 = 0;
-
-        float targetX = x2;
-        float targetY = y2;
-        float targetTheta = theta2;
-
-        Pose targetPose = new Pose(targetX, targetY, targetTheta);
+        Pose targetPose = new Pose(x2, y2, theta2);
         monitor.writeGuidanceComment("Generated parking trajectory to: " + targetPose.toString());
 
         return targetPose;
     }
 
     private Pose computeUnparkingTrajectory(Pose currentPose) {
-        float x = currentPose.getX() - 20; // Moves back by 20 cm
+        float x = currentPose.getX() - 20;
         float y = currentPose.getY();
-        float theta = 0; // Aligns with the black line
+        float theta = 0;
 
         Pose returnPose = new Pose(x, y, theta);
         monitor.writeGuidanceComment("Generated unparking trajectory to: " + returnPose.toString());
 
         return returnPose;
     }
-    
-    public static CurrentStatus getCurrentStatus(){
-		return GuidanceAT.currentStatus;
-	}
+
+    public static CurrentStatus getCurrentStatus() {
+        return GuidanceAT.currentStatus;
+    }
+
+    public static void main(String[] args) throws Exception {
+        while (Button.ENTER.isDown()) {}
+
+        currentStatus = CurrentStatus.PAUSE;
+        lastStatus = CurrentStatus.EXIT;
+
+        NXTMotor leftMotor = new NXTMotor(MotorPort.B);
+        NXTMotor rightMotor = new NXTMotor(MotorPort.A);
+
+        IMonitor monitor = new Monitor();
+
+        IPerception perception = new PerceptionPMP(leftMotor, rightMotor, monitor);
+        perception.calibrateLineSensors();
+
+        INavigation navigation = new NavigationAT(perception, monitor);
+        IControl control = new ControlRST(perception, navigation, leftMotor, rightMotor, monitor);
+        INxtHmi hmi = new HmiPLT(perception, navigation, control, monitor);
+
+        GuidanceAT guidance = new GuidanceAT(control, navigation, hmi, monitor);
+
+        monitor.startLogging();
+
+        while (true) {
+            guidance.execute();
+            Thread.sleep(100);
+        }
+    }
 }
