@@ -272,11 +272,11 @@ public class NavigationAT implements INavigation{
 
 	}
 	
-	private boolean detectCorner(int method, double angleResult){
+	private void detectCorner(int method, double angleResult){
 		
+		// Method 1
+		// Detect corner when the change in angle is big enough while a line sensor detects black
 		if (method == 1){
-			// Method 1
-			// Detect corner when the change in angle is big enough while a line sensor detects black
 			if (this.line_state == 0){
 				if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
 					|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
@@ -296,9 +296,9 @@ public class NavigationAT implements INavigation{
 			}
 		}
 		
+		// Method 2
+		// Detects corner when a lineSensor has detected black for a certain time period
 		else if (method == 2){
-			// Method 2
-			// Detects corner when a lineSensor has detected black for a certain time period
 			if (this.line_state == 0){
 				if ((this.lineSensorLeft == 2 && this.lineSensorRight == 0)
 					|| (this.lineSensorLeft == 0 && this.lineSensorRight == 2)){
@@ -317,18 +317,15 @@ public class NavigationAT implements INavigation{
 				}
 			}
 		}
-				
+		
+		// Method 3
+		// Detects change of line/ corner turn 
+		// when it is 20° from reaching the desired angle of the next line		
 		else if (method == 3){
-			// Method 3
-			// Detects change of line/ corner turn 
-			// when it is 20° from reaching the desired angle of the next line
-			
 			if (Math.abs(angleResult - this.nextLineAngle) <= 20){
 				this.turn_corner = true;
 			}
 		}
-		
-		return this.turn_corner;		
 	}
 	
 	/**
@@ -402,34 +399,49 @@ public class NavigationAT implements INavigation{
 		// Turns angle to degrees
 		angleResult = Math.toDegrees(angleResult);
 		
-		// Updates coordinates according to lineSensors
-		if (line_state_coords == 0){
+		// Correction of XY coordinates according to lineSensors
+		if (this.line_state_coords == 0){
+			
+			// Both Line Sensors Detect White
 			if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
-				line_state_coords = 1;
-				ref_time_coords = System.currentTimeMillis();
+				this.line_state_coords = 1;
+				this.ref_time_coords = System.currentTimeMillis();
 			}
 		}
 		
-		else if (line_state_coords == 1){
+		else if (this.line_state_coords == 1){
+			
+			// One of the Line Sensors doesnt detect White (Robot is not going straight)
 			if (this.lineSensorLeft != 0 || this.lineSensorRight != 0){
-				line_state_coords = 0;
-				ref_time_coords = System.currentTimeMillis();
-			} else if (this.lineSensorLeft == 0 && this.lineSensorRight == 0 && Math.abs(System.currentTimeMillis() - ref_time_coords) >= 2000){
-				line_state_coords = 0;
-				ref_time_coords = System.currentTimeMillis();
-				Sound.playTone(260,100); // DO4, 0.5s
+				this.line_state_coords = 0;
+				this.ref_time_coords = System.currentTimeMillis();
+			}
+			
+			// 2 seconds have passed with robot going straight
+			else if (Math.abs(System.currentTimeMillis() - this.ref_time_coords) >= 2000){
+				this.line_state_coords = 0;
+				this.ref_time_coords = System.currentTimeMillis();
+				Sound.playTone(260,100); // C4
+				
+				// Corrects X if line is horizontal
 				if (this.map[this.currentLine].getX1() == this.map[this.currentLine].getX2()){
 					xResult = this.map[this.currentLine].getX1()/100; //m
+					
+				// Corrects Y if line is vertical
 				} else if (this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2()){
 					yResult = this.map[this.currentLine].getY1()/100;
 				}
+				
+				// Corrects angle to currentLineAngle
 				angleResult = this.currentLineAngle;
 			}
 		}
-		// Updates this.turn_corner
+		
+		// Detects Corner Turns
+		// updates this.turn_corner
 		detectCorner(3, angleResult);
 		
-		// Correction of XY Coordinates according to Map
+		// Correction of XY Coordinates After Corner Turn
 		if (this.turn_corner){
 			
 			this.turn_corner = false;
@@ -439,9 +451,7 @@ public class NavigationAT implements INavigation{
 			
 			// Updates Current Line Index of the Map
 			// Increases counter by one as long as the robot wasn't on the last line
-			if (this.currentLine < this.map.length - 1){
-				this.currentLine++;
-			}
+			if (this.currentLine < this.map.length - 1){this.currentLine++;}
 			
 			// Resets line number and increases lap number if the robot finished the last line
 			else {
@@ -473,7 +483,7 @@ public class NavigationAT implements INavigation{
 			else if (this.currentLineAngle == 270 + 360*this.lapNumber) {yMap -= 5;}
 			
 			// Plays sound
-			Sound.beep();
+			Sound.playTone(130,100); // C3
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
@@ -506,24 +516,14 @@ public class NavigationAT implements INavigation{
 			// If difference between angleResult and currentLineAngle (desired angle) is too big
 			&& Math.abs(this.currentLineAngle - angleResult) >= 5){
 					
-			// If they have measured the same distance at least 3 times
-			// (Avoids 'lucky' measurements)
-			//if (this.parallelCounter < 3){this.parallelCounter++;}	
-			//else if (this.parallelCounter >= 3){
+				// Plays sound
+				Sound.playTone(523,100); //C5
 				
-				// Resets counter
-				//this.parallelCounter = 0;
-
-					
-					// Plays sound
-					Sound.twoBeeps();
-					
-					// Updates angleResult
-					monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult) + " to: " + String.valueOf(this.currentLineAngle));
-					angleResult = this.currentLineAngle;
-			//}
+				// Updates angleResult
+				monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult) + " to: " + String.valueOf(this.currentLineAngle));
+				angleResult = this.currentLineAngle;
 				
-		} //else {this.parallelCounter = 0;}
+		}
 	
 		// MONITOR (example)
 		monitor.writeNavigationVar("Lap", "" + this.lapNumber);
