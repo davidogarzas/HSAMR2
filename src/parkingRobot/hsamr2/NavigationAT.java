@@ -36,15 +36,11 @@ public class NavigationAT implements INavigation{
 		
 	// Custom Variables
 	int currentLine = 0;
-	int lapNumberAngleCalculation = 0;
 	int lapNumber = 0;
 	double currentLineAngle = 0;
 	double nextLineAngle = 0;
-	double lastAngleResult = 0;
-	boolean initialize = false;
+	
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
-	int parallelCounter = 0;
-	int distanceCounter = 0;
 	
 	float[] lineAngles = {0,0,0,0,0,0,0,0};
 	
@@ -53,12 +49,11 @@ public class NavigationAT implements INavigation{
 	int line_state_coords = 0;
 	long ref_time_coords = 0;
 	long ref_time = 0;
-	boolean turn_corner = false;
 	// 0 = both white
 	// 1 = different
 	
 	// For parkingSlots
-	float measurementQuality = 100;
+	float measurementQualityEncoders = 100;
 	double measurementQualityDistanceFactor = 0.001;
 	float measurementQualityBegin = 100;
 	float measurementQualityEnd = 100;
@@ -68,10 +63,7 @@ public class NavigationAT implements INavigation{
 	Point parkingSlotEnd = new Point(0,0);
 	float finalX = 0;
 	float finalY = 0;
-	int state = 0;
-	double sizeRobot = 25; // Check size
-	double sizeParkingSpace = 45;
-	int limitDistanceSensors = 15;
+	int parking_slot_state = 0;
 	int parkingSlotID = 0;
 	
 	/**
@@ -272,7 +264,9 @@ public class NavigationAT implements INavigation{
 
 	}
 	
-	private void detectCorner(int method, double angleResult){
+	private boolean detectCorner(int method, double angleResult){
+		
+		boolean turn_corner = false;
 		
 		// Method 1
 		// Detect corner when the change in angle is big enough while a line sensor detects black
@@ -289,7 +283,7 @@ public class NavigationAT implements INavigation{
 				if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
 					this.line_state = 0;
 					if (Math.abs((angleResult - this.prevAngle)) >= 70){
-						this.turn_corner = true; 
+						turn_corner = true; 
 					}
 					this.prevAngle = angleResult;
 				}
@@ -311,7 +305,7 @@ public class NavigationAT implements INavigation{
 				if (this.lineSensorLeft == 0 && this.lineSensorRight == 0){
 					this.line_state = 0;
 					if (Math.abs((System.currentTimeMillis() - this.ref_time)) >= 200){
-						this.turn_corner = true; 
+						turn_corner = true; 
 					}
 					this.ref_time = System.currentTimeMillis();
 				}
@@ -323,9 +317,11 @@ public class NavigationAT implements INavigation{
 		// when it is 20° from reaching the desired angle of the next line		
 		else if (method == 3){
 			if (Math.abs(angleResult - this.nextLineAngle) <= 20){
-				this.turn_corner = true;
+				turn_corner = true;
 			}
 		}
+
+		return turn_corner;
 	}
 	
 	/**
@@ -348,10 +344,10 @@ public class NavigationAT implements INavigation{
 		this.backSideSensorDistance	= perception.getBackSideSensorDistance()/10;
 	}		 		
 	
-	/**
-	 * calculates the robot pose from the measurements
-	 */
-	private void calculateLocation(){
+	// Calculates robot pose from odometry/ encoders
+	private double[] calculateOdometry(){
+		
+		double[] pose_results = new double[3];
 		
 		// Variable Declarations
 		double leftAngleSpeed 	= this.angleMeasurementLeft.getAngleSum()  / ((double)this.angleMeasurementLeft.getDeltaT()/1000);  //degree/seconds
@@ -369,8 +365,6 @@ public class NavigationAT implements INavigation{
 		double xResult 		= 0;
 		double yResult 		= 0;
 		
-		double xMap			= 0;
-		double yMap			= 0;
 		double angleResult  = 0;
 						
 		double deltaT       = ((double)this.angleMeasurementLeft.getDeltaT())/1000;
@@ -392,14 +386,25 @@ public class NavigationAT implements INavigation{
 			yResult 		= Math.sin(w * deltaT) * (this.pose.getX()-ICCx) + Math.cos(w * deltaT) * (this.pose.getY() - ICCy) + ICCy;
 			angleResult 	= this.pose.getHeading() + w * deltaT;
 		}
-		
+
 		// Updates measurementQuality
-		this.measurementQuality -= this.measurementQualityDistanceFactor;
+		this.measurementQualityEncoders -= this.measurementQualityDistanceFactor;
 		
 		// Turns angle to degrees
 		angleResult = Math.toDegrees(angleResult);
 		
-		// Correction of XY coordinates according to lineSensors
+		// Packs into array
+		pose_results[0] = xResult;
+		pose_results[1] = yResult;
+		pose_results[2] = angleResult;
+		
+		return pose_results;
+	}
+	
+	private double[] poseCorrectionLineSensors(double xResult, double yResult, double angleResult){
+		
+		double[] pose_results = new double[3];
+		
 		if (this.line_state_coords == 0){
 			
 			// Both Line Sensors Detect White
@@ -421,7 +426,7 @@ public class NavigationAT implements INavigation{
 			else if (Math.abs(System.currentTimeMillis() - this.ref_time_coords) >= 2000){
 				this.line_state_coords = 0;
 				this.ref_time_coords = System.currentTimeMillis();
-				Sound.playTone(260,100); // C4
+				// Sound.playTone(260,100); // C4
 				
 				// Corrects X if line is horizontal
 				if (this.map[this.currentLine].getX1() == this.map[this.currentLine].getX2()){
@@ -437,14 +442,23 @@ public class NavigationAT implements INavigation{
 			}
 		}
 		
-		// Detects Corner Turns
-		// updates this.turn_corner
-		detectCorner(3, angleResult);
+		// Packs into array
+		pose_results[0] = xResult;
+		pose_results[1] = yResult;
+		pose_results[2] = angleResult;
 		
-		// Correction of XY Coordinates After Corner Turn
-		if (this.turn_corner){
-			
-			this.turn_corner = false;
+		return pose_results;
+	}
+	
+	private double[] poseCorrectionCornerTurn(double xResult, double yResult, double angleResult){
+		
+		double[] pose_results = new double[3];
+		double xMap	= 0;
+		double yMap	= 0;
+		
+		boolean turn_corner = this.detectCorner(3, angleResult);
+		
+		if (turn_corner){
 			
 			// Updates angle of finished line (on next lap, it will need +360°)
 			this.lineAngles[this.currentLine] += 360;
@@ -483,7 +497,7 @@ public class NavigationAT implements INavigation{
 			else if (this.currentLineAngle == 270 + 360*this.lapNumber) {yMap -= 5;}
 			
 			// Plays sound
-			Sound.playTone(130,100); // C3
+			// Sound.playTone(130,100); // C3
 			
 			// Prints info
 			monitor.writeNavigationComment("Now on Line " + currentLine);
@@ -498,10 +512,20 @@ public class NavigationAT implements INavigation{
 			yResult = yMap / 100; // m
 			
 			// Resets MeasurementQuality
-			this.measurementQuality = 10;
+			this.measurementQualityEncoders = 10;
 		}
 		
-		// Correction of angle using SideDistanceSensors
+		// Packs into array
+		pose_results[0] = xResult;
+		pose_results[1] = yResult;
+		pose_results[2] = angleResult;
+		
+		return pose_results;
+	}
+	
+	private double[] angleCorrectionSideDistanceSensors(double xResult, double yResult, double angleResult){
+		
+		double[] pose_results = new double[3];
 		
 		// If both line sensors are on white (going straight)
 		if (this.lineSensorLeft == 0 && this.lineSensorRight == 0
@@ -517,25 +541,79 @@ public class NavigationAT implements INavigation{
 			&& Math.abs(this.currentLineAngle - angleResult) >= 5){
 					
 				// Plays sound
-				Sound.playTone(523,100); //C5
+				//Sound.playTone(523,100); //C5
 				
 				// Updates angleResult
 				monitor.writeNavigationComment("Corrected Angle from: " + String.valueOf(angleResult) + " to: " + String.valueOf(this.currentLineAngle));
-				angleResult = this.currentLineAngle;
-				
+				angleResult = this.currentLineAngle;		
 		}
+
+		// Packs into array
+		pose_results[0] = xResult;
+		pose_results[1] = yResult;
+		pose_results[2] = angleResult;
+		return pose_results;
+	}
 	
+	private double[] template_pose_correction(double xResult, double yResult, double angleResult){
+		double[] pose_results = new double[3];
+		
+		// Packs into array
+		pose_results[0] = xResult;
+		pose_results[1] = yResult;
+		pose_results[2] = angleResult;
+		return pose_results;
+	}
+	
+	private float calculateMeasurementQuality(){
+		
+		double measurementQuality = 0;
+		double measurementQualityAngle = 0; // 90° is max error
+		double measurementQualityPose = 0;  // 10 cm is max error	
+		
+		measurementQualityAngle = 100 - Math.abs((Math.toDegrees(this.pose.getHeading())-this.currentLineAngle))*100/90;
+		
+		if (this.map[this.currentLine].getX1() == this.map[this.currentLine].getX2()){measurementQualityPose = 100 - Math.abs(this.pose.getX()/100 - this.map[this.currentLine].getX1())*100/10;}
+		else if (this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2()){measurementQualityPose = 100 - Math.abs(this.pose.getY()/100 - this.map[this.currentLine].getY1())*100/10;}
+		
+		measurementQuality = this.measurementQualityEncoders*0.5 + measurementQualityAngle*0.2 + measurementQualityPose*0.3;
+		
+		return (float) measurementQuality;
+	}
+	
+	/**
+	 * calculates the robot pose
+	 */
+	private void calculateLocation(){
+		
+		double[] pose_results = new double[3];
+		// pose_results[0] = xResult [m]
+		// pose_results[1] = yResult [m]
+		// pose_results[2] = angleResult [°]
+		
+		// Calculates pose using odometry/ encoders 
+		pose_results = this.calculateOdometry();
+		
+		// Correction of pose according to lineSensors (if robot is going straight)
+		pose_results = this.poseCorrectionLineSensors(pose_results[0],pose_results[1],pose_results[2]);
+		
+		// Correction of pose after corner turn
+		pose_results = this.poseCorrectionCornerTurn(pose_results[0],pose_results[1],pose_results[2]);
+		
+		// Correction of angle using SideDistanceSensors
+		pose_results = this.angleCorrectionSideDistanceSensors(pose_results[0],pose_results[1],pose_results[2]);
+		
 		// MONITOR (example)
 		monitor.writeNavigationVar("Lap", "" + this.lapNumber);
 		monitor.writeNavigationVar("Line", "" + this.currentLine);
-		monitor.writeNavigationVar("X", "" + (xResult * 100));
-		monitor.writeNavigationVar("Y", "" + (yResult * 100));
-		monitor.writeNavigationVar("Phi", "" + angleResult);	
-		monitor.writeNavigationVar("PhiError", "" + (angleResult - this.currentLineAngle));	
+		monitor.writeNavigationVar("X", "" + (pose_results[0] * 100)); // [cm]
+		monitor.writeNavigationVar("Y", "" + (pose_results[1] * 100)); // [cm]
+		monitor.writeNavigationVar("Phi", "" + pose_results[2]); // [°]
+		monitor.writeNavigationVar("PhiError", "" + (pose_results[2] - this.currentLineAngle));	// [°]
 		
-		this.pose.setLocation((float)xResult, (float)yResult);
-		this.pose.setHeading((float)(angleResult*Math.PI/180));
-		
+		// Updates global pose (used by other methods/ modules)
+		this.pose.setLocation((float)pose_results[0], (float)pose_results[1]); // [m]
+		this.pose.setHeading((float)(pose_results[2]*Math.PI/180)); // [rad]
 	}
 
 	/**
@@ -546,122 +624,150 @@ public class NavigationAT implements INavigation{
 		// Variables
 		boolean newSlot = true;
 		double sizeMeasured = 0;
+		double sizeParkingSpace = 30;
+		double allowedError = 10;
+		double limitDistanceSensors = 11;
+	
 
 		// state 0 = Looking for Beginning of Possible Slot
 		// state 1 = Measuring Possible Slot
 		
 		// Looking for Beginning of Possible Slot
-		if (this.state == 0){
-			
-			// Sensor detects enough depth for parking space
-			if (this.frontSideSensorDistance >= this.limitDistanceSensors){
-				
-				// Resets distanceCounter and goes to next state
-				this.distanceCounter = 0;
-				this.state = 1;
-				
-				// Plays sound
-				// Sound.playTone(260,100); // DO4, 0.5s
-				
-				// Saves Back Coordinate of Parking Slot
-				this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY()); // m
-				
-				// Saves Measurement Quality of Begin Point
-				this.measurementQualityBegin = this.measurementQuality;
-			}
-				
-		// Measuring Possible Slot
-		} else if (this.state == 1){
-			
-			// Sensor stops detecting enough space for parking space
-			if (this.frontSideSensorDistance < this.limitDistanceSensors){
-				
-				// Saves Front Coordinates of Parking Slot
-				this.parkingSlotEnd.setLocation(this.pose.getX(), this.pose.getY());
-				sizeMeasured = this.parkingSlotEnd.distance(this.parkingSlotBegin)*100; // cm
-				this.measurementQualityEnd = this.measurementQuality;
-				this.state = 0;
-				
-				// Space is too small
-				if (sizeMeasured < this.sizeParkingSpace){
+		if (this.parking_slot_state == 0){
+
+				// Sensor detects enough depth for parking space
+				if (this.frontSideSensorDistance >= limitDistanceSensors){
+					
+					// Goes to next state
+					this.parking_slot_state = 1;
 					
 					// Plays sound
-					// Sound.playTone(130,100); // DO3, 0.5s
+					//Sound.playTone(260,100); // C4
 					
-					monitor.writeNavigationComment("Slot not possible");
-					monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
-					monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " Y: " + this.parkingSlotEnd.getY()*100);
-					monitor.writeNavigationComment("Size Measured: " + sizeMeasured);					
-					/*
-					// Look through array, see if first coordinate was saved and update slot
-					if (!this.parkingSlotsList.isEmpty()){
+					// Saves Back Coordinate of Parking Slot
+					this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY()); // m
+					
+					// Saves Measurement Quality of Begin Point
+					this.measurementQualityBegin = calculateMeasurementQuality();
+				}
+			
+				
+		// Measuring Possible Slot
+		} else if (this.parking_slot_state == 1){
+			
+				// Sensor stops detecting enough space for parking space
+				if (this.frontSideSensorDistance < limitDistanceSensors){
+					
+					// Saves Front Coordinates of Parking Slot
+					this.parkingSlotEnd.setLocation(this.pose.getX(), this.pose.getY());
+					sizeMeasured = this.parkingSlotEnd.distance(this.parkingSlotBegin)*100; // cm
+					this.measurementQualityEnd = calculateMeasurementQuality();
+					this.parking_slot_state = 0;
+					
+					// Space is too small
+					if (sizeMeasured < sizeParkingSpace){
 						
-						// Check existing array
-						for (int i = 0; i < this.parkingSlotsList.size(); i++) {
+						boolean slotExists = false;
+						
+						monitor.writeNavigationComment("Slot not possible");
+						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " Y: " + this.parkingSlotBegin.getY()*100);
+						monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " Y: " + this.parkingSlotEnd.getY()*100);
+						monitor.writeNavigationComment("Size Measured: " + sizeMeasured);					
+						
+						// Look through array, see if first coordinate was saved and update slot
+						if (!this.parkingSlotsList.isEmpty()){
 							
-							// Parking Slot already exists
-							if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 10){	
+							// Check existing array
+							for (int i = 0; i < this.parkingSlotsList.size(); i++) {
 								
-								// Update parking slot
+								// ADD CASES (PENDING) (ex first point exists, second doesnt
+								// first point doesnt exist, second does)
 								
-								this.parkingSlotsList.get(i).setFrontBoundaryPosition(this.parkingSlotEnd.clone());
-								this.parkingSlotsList.get(i).setStatus(ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING);
-	
-								monitor.writeNavigationComment("Changed Slot " + this.parkingSlotsList.get(i).getID());
-								monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
-								monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
-					
-								break;
+								// Parking Slot already exists
+								if (this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < allowedError){	
+									
+									slotExists = true;
+									
+									// Plays sound
+									Sound.playTone(130,100); // C3
+									
+									// Update parking slot
+									
+									this.parkingSlotsList.get(i).setFrontBoundaryPosition(this.parkingSlotEnd.clone());
+									this.parkingSlotsList.get(i).setStatus(ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING);
+		
+									monitor.writeNavigationComment("Changed Slot " + this.parkingSlotsList.get(i).getID());
+									monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
+									monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
+						
+									break;
+								}
 							}
 						}
-					} */
-				} else if (sizeMeasured >= this.sizeParkingSpace){
+						if (!slotExists){
+							// Plays sound
+							Sound.playTone(260,100); // C4
+						}
+					} 
 					
-					/*
-					// Checks current array of parkingSlots
-					if (!this.parkingSlotsList.isEmpty()){
-						for (int i = 0; i < this.parkingSlotsList.size(); i++) {
-							
-							// Parking Slot already exists (same coordinates)
-							if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < 10
-								&& this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < 10){	
+					else if (sizeMeasured >= sizeParkingSpace){
+						
+						
+						// Checks current array of parkingSlots
+						if (!this.parkingSlotsList.isEmpty()){
+							for (int i = 0; i < this.parkingSlotsList.size(); i++) {
 								
-								// Plays sound
-								Sound.playTone(260,100); // DO4, 0.5s
-								
-								// Update parking slot
-								monitor.writeNavigationComment("Parking Slot Exists");
-								monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
-								monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
-								newSlot = false;
-								break;
+								// Parking Slot already exists (same coordinates)
+								if (this.parkingSlotsList.get(i).getFrontBoundaryPosition().distance(this.parkingSlotEnd)*100 < allowedError
+									&& this.parkingSlotsList.get(i).getBackBoundaryPosition().distance(this.parkingSlotBegin)*100 < allowedError){
+									
+									// Update parking slot (PENDING)
+									// Compare measurement qualities for what coordinates to keep
+									if (this.parkingSlotsList.get(i).getStatus() == ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING){
+										this.parkingSlotsList.get(i).setStatus(ParkingSlotStatus.SUITABLE_FOR_PARKING);
+									}
+									
+									// Plays sound
+									Sound.playTone(2093,100); // C7
+									
+									/*
+									// Update parking slot
+									monitor.writeNavigationComment("Parking Slot Exists");
+									monitor.writeNavigationComment("Begin X: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getBackBoundaryPosition().getY()*100);
+									monitor.writeNavigationComment("Front X: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getX()*100 + " Y: " + this.parkingSlotsList.get(i).getFrontBoundaryPosition().getY()*100);
+									*/
+									
+									newSlot = false;
+									break;
+								}
 							}
 						}
-					} */
-					
-					// Adding New Parking Slot
-					if (newSlot){
-						this.parkingSlotID++;
-						this.parkingSlotsList.add(
-								new ParkingSlot(
-										this.parkingSlotID, 
-										this.parkingSlotBegin.clone(), 
-										this.parkingSlotEnd.clone(), 
-										ParkingSlotStatus.SUITABLE_FOR_PARKING, 
-										Math.round((this.measurementQualityBegin + this.measurementQualityEnd)/2))
-								);
 						
-						// Plays sound
-						// Sound.playTone(520,100); // DO4, 0.5s
-						
-						monitor.writeNavigationComment("Added New Slot");
-						monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
-						monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
-						monitor.writeNavigationComment("Size Measured: " + sizeMeasured);
-						monitor.writeNavigationComment("Quality: " + Math.round((this.measurementQualityBegin + this.measurementQualityEnd)/2));
+						// Adding New Parking Slot
+						if (newSlot){
+							this.parkingSlotID++;
+							this.parkingSlotsList.add(
+									new ParkingSlot(
+											this.parkingSlotID, 
+											this.parkingSlotBegin.clone(), 
+											this.parkingSlotEnd.clone(), 
+											ParkingSlotStatus.SUITABLE_FOR_PARKING, 
+											Math.round((this.measurementQualityBegin + this.measurementQualityEnd)/2))
+									);
+							
+							// Plays sound
+							Sound.playTone(1046,100); // C6
+							
+							monitor.writeNavigationComment("Added New Slot");
+							monitor.writeNavigationComment("Begin X: " + this.parkingSlotBegin.getX()*100 + " and Y: " + this.parkingSlotBegin.getY()*100);
+							monitor.writeNavigationComment("End X: " + this.parkingSlotEnd.getX()*100 + " and Y: " + this.parkingSlotEnd.getY()*100);
+							monitor.writeNavigationComment("Size Measured: " + sizeMeasured);
+							monitor.writeNavigationComment("Quality: " + Math.round((this.measurementQualityBegin + this.measurementQualityEnd)/2));
+						}
 					}
 				}
-			}
+			
+			
 		}
 		
 		return;
