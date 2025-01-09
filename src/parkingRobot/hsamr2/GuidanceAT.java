@@ -14,10 +14,6 @@ import lejos.robotics.navigation.Pose;
 import lejos.geom.Line;
 import lejos.nxt.LCD;
 
-/**
- * Main Guidance class for the parking robot.
- * Handles state machine logic and path generation.
- */
 public class GuidanceAT {
 
     public enum CurrentStatus {
@@ -38,9 +34,7 @@ public class GuidanceAT {
     protected static CurrentStatus lastStatus = CurrentStatus.EXIT;
     private static ScoutSubState scoutSubState = ScoutSubState.FOLLOW_LINE;
 
-    /**
-     * Defines the map of the robot course.
-     */
+    // Map definition
     static Line line0 = new Line(0, 0, 180, 0);
     static Line line1 = new Line(180, 0, 180, 60);
     static Line line2 = new Line(180, 60, 150, 60);
@@ -64,9 +58,6 @@ public class GuidanceAT {
         this.monitor = monitor;
     }
 
-    /**
-     * Main logic of the Guidance module
-     */
     public void execute() {
         switch (currentStatus) {
             case SCOUT:
@@ -115,13 +106,15 @@ public class GuidanceAT {
         }
 
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
-        int selectedSlot = hmi.getSelectedParkingSlot();
-        for (INavigation.ParkingSlot slot : slots) {
-            if (slot.getID() == selectedSlot) {
-                Pose currentPose = navigation.getPose();
-                Pose targetPose = computeParkingTrajectory(currentPose, slot);
-                control.setDestination(targetPose.getHeading(), targetPose.getX(), targetPose.getY());
-                break;
+        if (hmi != null) {
+            int selectedSlot = hmi.getSelectedParkingSlot();
+            for (INavigation.ParkingSlot slot : slots) {
+                if (slot.getID() == selectedSlot) {
+                    Pose currentPose = navigation.getPose();
+                    Pose targetPose = computeParkingTrajectory(currentPose, slot);
+                    control.setDestination(targetPose.getHeading(), targetPose.getX(), targetPose.getY());
+                    break;
+                }
             }
         }
 
@@ -157,6 +150,8 @@ public class GuidanceAT {
     }
 
     private void checkForStateTransition() {
+        if (hmi == null) return; // Skip if HMI is unavailable
+
         INxtHmi.Mode mode = hmi.getMode();
 
         switch (mode) {
@@ -205,7 +200,7 @@ public class GuidanceAT {
     }
 
     public static void main(String[] args) throws Exception {
-        while (Button.ENTER.isDown()) {}
+        while (Button.ENTER.isDown()) {} // Wait for button release at the start
 
         currentStatus = CurrentStatus.PAUSE;
         lastStatus = CurrentStatus.EXIT;
@@ -216,18 +211,38 @@ public class GuidanceAT {
         IMonitor monitor = new Monitor();
 
         IPerception perception = new PerceptionPMP(leftMotor, rightMotor, monitor);
-        perception.calibrateLineSensors();
+
+        // Perform calibration once
+        LCD.clear();
+        LCD.drawString("Calibrating Sensors...", 0, 0);
+        perception.calibrateLineSensors(); // Standard calibration
+        LCD.clear();
+        LCD.drawString("Calibration Done", 0, 0);
+        Thread.sleep(1000); // Show a brief confirmation
 
         INavigation navigation = new NavigationAT(perception, monitor);
         IControl control = new ControlRST(perception, navigation, leftMotor, rightMotor, monitor);
-        INxtHmi hmi = new HmiPLT(perception, navigation, control, monitor);
+        INxtHmi hmi = null; // Start without HMI to skip Bluetooth
 
         GuidanceAT guidance = new GuidanceAT(control, navigation, hmi, monitor);
+
+        // Display sensor data
+        while (!Button.ENTER.isDown()) {
+            LCD.clear();
+            Pose currentPose = navigation.getPose();
+            LCD.drawString("X: " + (currentPose.getX() * 100), 0, 0);
+            LCD.drawString("Y: " + (currentPose.getY() * 100), 0, 1);
+            LCD.drawString("Phi: " + (currentPose.getHeading() * 180 / Math.PI), 0, 2); // Display Phi
+            perception.showSensorData(); // Displays sensor values
+            LCD.drawString("Press ENTER to Start", 0, 6);
+            Thread.sleep(100);
+        }
+        while (Button.ENTER.isDown()) {} // Wait for button release to prevent double trigger
 
         monitor.startLogging();
 
         while (true) {
-            guidance.execute();
+            guidance.execute(); // Start the Guidance module's main logic
             Thread.sleep(100);
         }
     }
