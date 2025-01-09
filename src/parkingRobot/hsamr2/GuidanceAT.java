@@ -10,18 +10,42 @@ import parkingRobot.INavigation;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
+import lejos.geom.Line;
+import lejos.nxt.LCD;
 import lejos.robotics.navigation.Pose;
+
+import parkingRobot.hsamr2.ControlRST;
+import parkingRobot.hsamr2.HmiPLT;
+import parkingRobot.hsamr2.NavigationAT;
+import parkingRobot.hsamr2.PerceptionPMP;
+import lejos.nxt.MotorPort;
+import lejos.nxt.NXTMotor;
+import parkingRobot.IControl;
+import parkingRobot.IControl.*;
+import parkingRobot.INxtHmi;
+import parkingRobot.INavigation;
+import parkingRobot.IPerception;
+import parkingRobot.IMonitor;
+
 import lejos.geom.Line;
 import lejos.nxt.LCD;
 
+import parkingRobot.hsamr2.ControlRST;
+import parkingRobot.hsamr2.HmiPLT;
+import parkingRobot.hsamr2.NavigationAT;
+import parkingRobot.hsamr2.PerceptionPMP;
+/**
+ * Main class for 'Hauptseminar AMR' project 'autonomous parking'.
+ * This class handles the guidance and state logic for the parking robot.
+ */
 public class GuidanceAT {
 
     public enum CurrentStatus {
-        SCOUT,
-        PARK_THIS,
-        AUSPARKEN,
-        PAUSE,
-        EXIT
+        SCOUT, // Following line and detecting parking slots
+        PARK_THIS, // Performing parking maneuver
+        AUSPARKEN, // Exiting a parking slot
+        PAUSE, // Pausing all operations
+        EXIT // Shutting down the system
     }
 
     private enum ScoutSubState {
@@ -106,15 +130,13 @@ public class GuidanceAT {
         }
 
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
-        if (hmi != null) {
-            int selectedSlot = hmi.getSelectedParkingSlot();
-            for (INavigation.ParkingSlot slot : slots) {
-                if (slot.getID() == selectedSlot) {
-                    Pose currentPose = navigation.getPose();
-                    Pose targetPose = computeParkingTrajectory(currentPose, slot);
-                    control.setDestination(targetPose.getHeading(), targetPose.getX(), targetPose.getY());
-                    break;
-                }
+        int selectedSlot = hmi.getSelectedParkingSlot();
+        for (INavigation.ParkingSlot slot : slots) {
+            if (slot.getID() == selectedSlot) {
+                Pose currentPose = navigation.getPose();
+                Pose targetPose = computeParkingTrajectory(currentPose, slot);
+                control.setDestination(targetPose.getHeading(), targetPose.getX(), targetPose.getY());
+                break;
             }
         }
 
@@ -150,8 +172,6 @@ public class GuidanceAT {
     }
 
     private void checkForStateTransition() {
-        if (hmi == null) return; // Skip if HMI is unavailable
-
         INxtHmi.Mode mode = hmi.getMode();
 
         switch (mode) {
@@ -196,11 +216,11 @@ public class GuidanceAT {
     }
 
     public static CurrentStatus getCurrentStatus() {
-        return GuidanceAT.currentStatus;
+        return currentStatus;
     }
 
     public static void main(String[] args) throws Exception {
-        while (Button.ENTER.isDown()) {} // Wait for button release at the start
+        while (Button.ENTER.isDown()) {}
 
         currentStatus = CurrentStatus.PAUSE;
         lastStatus = CurrentStatus.EXIT;
@@ -212,38 +232,39 @@ public class GuidanceAT {
 
         IPerception perception = new PerceptionPMP(leftMotor, rightMotor, monitor);
 
-        // Perform calibration once
         LCD.clear();
         LCD.drawString("Calibrating Sensors...", 0, 0);
-        perception.calibrateLineSensors(); // Standard calibration
+        perception.calibrateLineSensors();
         LCD.clear();
         LCD.drawString("Calibration Done", 0, 0);
-        Thread.sleep(1000); // Show a brief confirmation
+        Thread.sleep(1000);
 
         INavigation navigation = new NavigationAT(perception, monitor);
         IControl control = new ControlRST(perception, navigation, leftMotor, rightMotor, monitor);
-        INxtHmi hmi = null; // Start without HMI to skip Bluetooth
+        INxtHmi hmi = new HmiPLT(perception, navigation, control, monitor);
 
         GuidanceAT guidance = new GuidanceAT(control, navigation, hmi, monitor);
 
-        // Display sensor data
         while (!Button.ENTER.isDown()) {
             LCD.clear();
-            Pose currentPose = navigation.getPose();
-            LCD.drawString("X: " + (currentPose.getX() * 100), 0, 0);
-            LCD.drawString("Y: " + (currentPose.getY() * 100), 0, 1);
-            LCD.drawString("Phi: " + (currentPose.getHeading() * 180 / Math.PI), 0, 2); // Display Phi
-            perception.showSensorData(); // Displays sensor values
+            guidance.showData(navigation, perception);
             LCD.drawString("Press ENTER to Start", 0, 6);
             Thread.sleep(100);
         }
-        while (Button.ENTER.isDown()) {} // Wait for button release to prevent double trigger
+        while (Button.ENTER.isDown()) {}
 
         monitor.startLogging();
 
         while (true) {
-            guidance.execute(); // Start the Guidance module's main logic
+            guidance.execute();
             Thread.sleep(100);
         }
+    }
+
+    protected static void showData(INavigation navigation, IPerception perception) {
+        LCD.clear();
+        LCD.drawString("X (in cm): " + (navigation.getPose().getX() * 100), 0, 0);
+        LCD.drawString("Y (in cm): " + (navigation.getPose().getY() * 100), 0, 1);
+        LCD.drawString("Phi (deg): " + (navigation.getPose().getHeading() * 180 / Math.PI), 0, 2);
     }
 }
