@@ -33,7 +33,10 @@ import parkingRobot.hsamr2.NavigationThread;
  */
 
 public class NavigationAT implements INavigation{
-		
+	
+	// Global Odometry Variables
+	double w = 0; // angular velocity [rad/s]
+	
 	// Custom Variables
 	int currentLine = 0;
 	boolean horizontalLine = false;
@@ -52,6 +55,7 @@ public class NavigationAT implements INavigation{
 	int angleCorrectionState = 0;
 	long ref_time_coords = 0;
 	long ref_time = 0;
+	long time_turning = 0;
 	double cornerTurnAngleResult = 0;
 	double cornerTurnxResult = 0;
 	double cornerTurnyResult = 0;
@@ -65,12 +69,10 @@ public class NavigationAT implements INavigation{
 	double measurementQualityDistanceFactor = 0.001;
 	float measurementQualityBegin = 100;
 	float measurementQualityEnd = 100;
-	float beginX = 0;
-	float beginY = 0;
+
 	Point parkingSlotBegin = new Point(0,0);
 	Point parkingSlotEnd = new Point(0,0);
-	float finalX = 0;
-	float finalY = 0;
+
 	int parking_slot_state = 0;
 	int parkingSlotID = 0;
 	
@@ -278,9 +280,9 @@ public class NavigationAT implements INavigation{
 		else {this.nextLineAngle = this.mapLineAngles[0];}
 		
 		// Updates type of line
-		this.horizontalLine = this.map[this.currentLine].getX1() == this.map[this.currentLine].getX2();
-		if (this.horizontalLine) {this.currentLineX = this.map[this.currentLine].getX1();} //cm
-		else if (!this.horizontalLine) {this.currentLineY = this.map[this.currentLine].getY1();} //cm
+		this.horizontalLine = this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2();
+		if (this.horizontalLine) {this.currentLineY = this.map[this.currentLine].getY1();} //cm
+		else if (!this.horizontalLine) {this.currentLineX = this.map[this.currentLine].getX1();} //cm
 	}
 	
 	private boolean detectCorner(double xResult, double yResult, double angleResult, int method){
@@ -353,9 +355,11 @@ public class NavigationAT implements INavigation{
 			} 
 			
 			else if (this.stateCornerTurn == 1){
+				
+				this.time_turning = System.currentTimeMillis() - this.ref_time;
+				
 				if (this.onWhite){
-					this.stateCornerTurn = 0;
-					if (System.currentTimeMillis() - this.ref_time >=150
+					if (this.time_turning >=150
 						&& Math.abs((angleResult - this.cornerTurnAngleResult)) >= 60
 						&& Math.abs(angleResult - this.nextLineAngle) <= 25){
 						
@@ -364,7 +368,9 @@ public class NavigationAT implements INavigation{
 						this.cornerTurnyDistance = yResult - this.cornerTurnyResult;
 					}
 					
+					this.stateCornerTurn = 0;
 					this.ref_time = System.currentTimeMillis();
+					this.time_turning = 0;
 					this.cornerTurnAngleResult = angleResult;
 					this.cornerTurnxResult = xResult;
 					this.cornerTurnyResult = yResult;
@@ -407,7 +413,7 @@ public class NavigationAT implements INavigation{
 
 		double vLeft		= (leftAngleSpeed  * Math.PI * LEFT_WHEEL_RADIUS ) / 180 ; //velocity of left  wheel in m/s
 		double vRight		= (rightAngleSpeed * Math.PI * RIGHT_WHEEL_RADIUS) / 180 ; //velocity of right wheel in m/s		
-		double w 			= (vRight - vLeft) / WHEEL_DISTANCE; //angular velocity of robot in rad/s
+		this.w 				= (vRight - vLeft) / WHEEL_DISTANCE; //angular velocity of robot in rad/s
 		
 		Double R 			= new Double(( WHEEL_DISTANCE / 2 ) * ( (vLeft + vRight) / (vRight - vLeft) ));								
 		
@@ -461,10 +467,10 @@ public class NavigationAT implements INavigation{
 		if (this.onWhite){
 			
 			// Corrects X if line is horizontal
-			if (this.horizontalLine){xResult = this.currentLineX/100;} //m
+			if (this.horizontalLine){yResult = this.currentLineY/100;} //m
 				
 			// Corrects Y if line is vertical
-			else if (!this.horizontalLine){yResult = this.currentLineY/100;} //m
+			else if (!this.horizontalLine){xResult = this.currentLineX/100;} //m
 		}
 		
 		// Correction for angle
@@ -600,22 +606,6 @@ public class NavigationAT implements INavigation{
 		return pose_results;
 	}
 	
-	private float calculateMeasurementQuality(){
-		
-		double measurementQuality = 0;
-		double measurementQualityAngle = 0; // 90° is max error
-		double measurementQualityPose = 0;  // 10 cm is max error	
-		
-		measurementQualityAngle = 100 - Math.abs((Math.toDegrees(this.pose.getHeading())-this.currentLineAngle))*100/90;
-		
-		if (this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getX()*100 - this.currentLineX)*100/10;}
-		else if (!this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getY()*100 - this.currentLineY)*100/10;}
-		
-		measurementQuality = this.measurementQualityEncoders*0.5 + measurementQualityAngle*0.2 + measurementQualityPose*0.3;
-		
-		return (float) measurementQuality;
-	}
-	
 	/**
 	 * calculates the robot pose
 	 */
@@ -651,6 +641,69 @@ public class NavigationAT implements INavigation{
 		this.pose.setHeading((float)(pose_results[2]*Math.PI/180)); // [rad]
 	}
 
+	private void saveParkingSlotCoordinate(boolean beginPoint, double wallDistance, double wallMeasurement){
+		
+		// Begin Point
+		if (beginPoint){
+			if (this.horizontalLine){
+				this.parkingSlotBegin.setLocation(
+					this.pose.getX() + wallMeasurement*Math.cos(this.pose.getHeading()-Math.PI/2)/100, //m
+					this.currentLineY/100 + wallDistance*Math.sin((currentLineAngle-90)*Math.PI/180)/100 //m
+				);
+			} 
+			
+			else if (!this.horizontalLine){
+				this.parkingSlotBegin.setLocation(
+					this.currentLineX/100 + wallDistance*Math.cos((currentLineAngle-90)*Math.PI/180)/100, //m
+					this.pose.getY() + wallMeasurement*Math.sin(this.pose.getHeading()-Math.PI/2)/100 //m
+				);
+			}	
+		} 
+		
+		// End Point
+		else if (!beginPoint){
+			if (this.horizontalLine){
+				this.parkingSlotEnd.setLocation(
+					this.pose.getX() + wallMeasurement*Math.cos(this.pose.getHeading()-Math.PI/2)/100, //m
+					this.currentLineY/100 + wallDistance*Math.sin((currentLineAngle-90)*Math.PI/180)/100 //m
+				);
+			} 
+			
+			else if (!this.horizontalLine){
+				this.parkingSlotEnd.setLocation(
+					this.currentLineX/100 + wallDistance*Math.cos((currentLineAngle-90)*Math.PI/180)/100, //m
+					this.pose.getY() + wallMeasurement*Math.sin(this.pose.getHeading()-Math.PI/2)/100 //m
+				);
+			}	
+		} 
+	}
+	
+	private float calculateMeasurementQuality(double angularVelocityAtMeasurement){
+		
+		double measurementQuality = 0;
+		double measurementQualityAngle = 0; // 90° is max error
+		double measurementQualityPose = 0;  // 10 cm is max error	
+		double measurementQualityAngularVelocity = 0; // 90 °/s is max error
+		
+		// Quality based on error from expected angle
+		measurementQualityAngle = 100 - Math.abs((Math.toDegrees(this.pose.getHeading())-this.currentLineAngle))*100/90;
+		
+		// Quality based on error from expected X or Y coordinate
+		if (this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getY()*100 - this.currentLineY)*100/10;}
+		else if (!this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getX()*100 - this.currentLineX)*100/10;}
+		
+		// Quality based on how long the robot had been making a turn (200 ms is max)
+		measurementQualityAngularVelocity = 100 - angularVelocityAtMeasurement*100/90;
+		
+		// Sum of quality factors
+		measurementQuality = this.measurementQualityEncoders*0.4 
+							+ measurementQualityAngle*0.2 
+							+ measurementQualityPose*0.2 
+							+ measurementQualityAngularVelocity*0.2;
+		
+		return (float) measurementQuality;
+	}
+	
 	/**
 	 * detects parking slots and manage them by initializing new slots, re-characterizing old slots or merge old and detected slots. 
 	 */
@@ -658,10 +711,12 @@ public class NavigationAT implements INavigation{
 		
 		// Variables
 		boolean newSlot = true;
-		double sizeMeasured = 0;
-		double sizeParkingSpace = 30;
-		double allowedError = 10;
-		double limitDistanceSensors = 11;
+		double sizeMeasured = 0; //cm
+		double sizeParkingSpace = 30; //cm
+		double allowedError = 10; //cm
+		double wallDistance = 11; //cm
+		double wallMeasurement = 0; //cm
+		double angularVelocityAtMeasurement = 0; // [°/s]
 	
 
 		// state 0 = Looking for Beginning of Possible Slot
@@ -671,19 +726,25 @@ public class NavigationAT implements INavigation{
 		if (this.parking_slot_state == 0){
 
 				// Sensor detects enough depth for parking space
-				if (this.frontSideSensorDistance >= limitDistanceSensors){
+				if (this.frontSideSensorDistance >= wallDistance){
 					
 					// Goes to next state
 					this.parking_slot_state = 1;
 					
+					// Saves measurement of wall
+					wallMeasurement = this.frontSideSensorDistance;
+					
+					// Saves time robot had been turning
+					angularVelocityAtMeasurement = this.w*180/Math.PI; //[°/s]
+					
 					// Plays sound
 					//Sound.playTone(260,100); // C4
 					
-					// Saves Back Coordinate of Parking Slot
-					this.parkingSlotBegin.setLocation(this.pose.getX(),this.pose.getY()); // m
+					// Saves Begin Coordinate of Parking Slot
+					this.saveParkingSlotCoordinate(true,wallDistance,wallMeasurement);
 					
 					// Saves Measurement Quality of Begin Point
-					this.measurementQualityBegin = calculateMeasurementQuality();
+					this.measurementQualityBegin = calculateMeasurementQuality(angularVelocityAtMeasurement);
 				}
 			
 				
@@ -691,13 +752,25 @@ public class NavigationAT implements INavigation{
 		} else if (this.parking_slot_state == 1){
 			
 				// Sensor stops detecting enough space for parking space
-				if (this.frontSideSensorDistance < limitDistanceSensors){
+				if (this.frontSideSensorDistance < wallDistance){
 					
-					// Saves Front Coordinates of Parking Slot
-					this.parkingSlotEnd.setLocation(this.pose.getX(), this.pose.getY());
-					sizeMeasured = this.parkingSlotEnd.distance(this.parkingSlotBegin)*100; // cm
-					this.measurementQualityEnd = calculateMeasurementQuality();
+					// Resets state
 					this.parking_slot_state = 0;
+
+					// Saves measurement of wall
+					wallMeasurement = this.frontSideSensorDistance;
+					
+					// Saves angular velocity at measurement
+					angularVelocityAtMeasurement = this.w*180/Math.PI; //[°/s]
+					
+					// Saves End Coordinates of Parking Slot
+					this.saveParkingSlotCoordinate(false, wallDistance, wallMeasurement);
+
+					// Calculates size of space
+					sizeMeasured = this.parkingSlotEnd.distance(this.parkingSlotBegin)*100; // cm
+					
+					// Calculates Quality
+					this.measurementQualityEnd = calculateMeasurementQuality(angularVelocityAtMeasurement);
 					
 					// Space is too small
 					if (sizeMeasured < sizeParkingSpace){
