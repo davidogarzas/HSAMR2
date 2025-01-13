@@ -10,10 +10,8 @@ import lejos.nxt.LCD;
 import parkingRobot.IControl;
 import parkingRobot.IControl.ControlMode;
 import parkingRobot.INavigation;
-import parkingRobot.INavigation.ParkingSlot;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
-import lejos.robotics.navigation.Pose;
 
 /**
  * Main class for 'Hauptseminar AMR' project 'autonomous parking' for students of electrical engineering
@@ -37,12 +35,6 @@ public class GuidanceAT {
     // Last known status of the robot
     protected static CurrentStatus lastStatus = CurrentStatus.EXIT;
 
-    // Lap counter
-    private static int lapCounter = 0;
-
-    // Cooldown for lap detection
-    private static long lastLapTime = 0;
-
     // Map lines for the robot's environment
     static Line line0 = new Line(0, 0, 180, 0);
     static Line line1 = new Line(180, 0, 180, 60);
@@ -56,7 +48,6 @@ public class GuidanceAT {
     static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
 
     public static void main(String[] args) throws Exception {
-
         while (Button.ENTER.isDown()) {}
 
         // Initialize robot status
@@ -73,6 +64,8 @@ public class GuidanceAT {
         perception.calibrateLineSensors();
 
         INavigation navigation = new NavigationAT(perception, monitor);
+        navigation.setMap(map);
+
         IControl control = new ControlRST(perception, navigation, leftMotor, rightMotor, monitor);
 
         monitor.startLogging();
@@ -83,71 +76,18 @@ public class GuidanceAT {
 
             switch (currentStatus) {
                 case SCOUT:
-                    // Handle SCOUT mode
-                    if (lastStatus != CurrentStatus.SCOUT) {
-                        control.setCtrlMode(ControlMode.LINE_CTRL);
-                    }
-
-                    // Update navigation and check for lap completion
-                    navigation.updateNavigation();
-                    checkLapCompletion(navigation);
-
-                    lastStatus = currentStatus;
-
-                    // Handle state transitions
-                    if (Button.ENTER.isDown()) {
-                        currentStatus = CurrentStatus.PAUSE;
-                        while (Button.ENTER.isDown()) {
-                            Thread.sleep(1); // Wait for button release
-                        }
-                    } else if (Button.ESCAPE.isDown()) {
-                        currentStatus = CurrentStatus.EXIT;
-                        while (Button.ESCAPE.isDown()) {
-                            Thread.sleep(1); // Wait for button release
-                        }
-                    } else if (Button.LEFT.isDown()) {
-                        currentStatus = CurrentStatus.PARK;
-                        while (Button.LEFT.isDown()) {
-                            Thread.sleep(1); // Wait for button release
-                        }
-                    }
+                    handleScoutMode(navigation, control);
                     break;
 
                 case PAUSE:
-                    // Handle PAUSE mode
-                    if (lastStatus != CurrentStatus.PAUSE) {
-                        control.setCtrlMode(ControlMode.INACTIVE);
-                    }
-
-                    lastStatus = currentStatus;
-
-                    // Handle state transitions
-                    if (Button.ENTER.isDown()) {
-                        currentStatus = CurrentStatus.SCOUT;
-                        while (Button.ENTER.isDown()) {
-                            Thread.sleep(1); // Wait for button release
-                        }
-                    } else if (Button.ESCAPE.isDown()) {
-                        currentStatus = CurrentStatus.EXIT;
-                        while (Button.ESCAPE.isDown()) {
-                            Thread.sleep(1); // Wait for button release
-                        }
-                    }
+                    handlePauseMode(control);
                     break;
 
                 case PARK:
-                    // Handle PARK mode
-                    if (lapCounter >= 1) {
-                        parkInSlot(navigation, control);
-                    } else {
-                        Sound.playTone(500, 500); // Beep to indicate parking is unavailable
-                        LCD.drawString("Complete 1 lap", 0, 4);
-                    }
-                    currentStatus = CurrentStatus.PAUSE;
+                    handleParkMode(navigation, control);
                     break;
 
                 case EXIT:
-                    // Handle EXIT mode
                     monitor.stopLogging();
                     System.exit(0);
                     break;
@@ -161,6 +101,96 @@ public class GuidanceAT {
     }
 
     /**
+     * Handles the SCOUT mode logic, including line following and parking slot detection.
+     */
+    private static void handleScoutMode(INavigation navigation, IControl control) throws InterruptedException {
+        if (lastStatus != CurrentStatus.SCOUT) {
+            control.setCtrlMode(ControlMode.LINE_CTRL); // Follow the line
+            navigation.setDetectionState(true); // Enable parking slot detection
+        }
+
+        // Update navigation to process slot detection
+        navigation.updateNavigation();
+
+        // Check for detected slots and beep if any are found
+        INavigation.ParkingSlot[] detectedSlots = navigation.getParkingSlots();
+        if (detectedSlots != null && detectedSlots.length > 0) {
+            Sound.playTone(1000, 200); // Beep for every slot detection
+        }
+
+        lastStatus = currentStatus;
+
+        // Handle button transitions
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.PAUSE;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1); // Wait for button release
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1); // Wait for button release
+            }
+        } else if (Button.RIGHT.isDown()) {
+            currentStatus = CurrentStatus.PARK;
+            while (Button.RIGHT.isDown()) {
+                Thread.sleep(1); // Wait for button release
+            }
+        }
+    }
+
+    /**
+     * Handles the PAUSE mode logic.
+     */
+    private static void handlePauseMode(IControl control) throws InterruptedException {
+        if (lastStatus != CurrentStatus.PAUSE) {
+            control.setCtrlMode(ControlMode.INACTIVE);
+        }
+
+        lastStatus = currentStatus;
+
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.SCOUT;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1);
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1);
+            }
+        }
+    }
+
+    /**
+     * Handles the PARK mode logic.
+     */
+    private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
+        INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
+
+        if (slots != null && slots.length > 0) {
+            INavigation.ParkingSlot targetSlot = slots[slots.length - 1]; // Use the last detected slot
+            control.setDestination(
+                0, // Heading (angle)
+                targetSlot.getFrontBoundaryPosition().x,
+                targetSlot.getFrontBoundaryPosition().y
+            );
+
+            control.setCtrlMode(ControlMode.PARK_CTRL);
+        } else {
+            // No slots available, return to SCOUT
+            currentStatus = CurrentStatus.SCOUT;
+        }
+
+        if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1); // Wait for button release
+            }
+        }
+    }
+
+    /**
      * Returns the current robot status.
      */
     public static CurrentStatus getCurrentStatus() {
@@ -168,68 +198,20 @@ public class GuidanceAT {
     }
 
     /**
+     * Sets the current robot status.
+     */
+    public static void setCurrentStatus(CurrentStatus status) {
+        currentStatus = status;
+    }
+
+    /**
      * Displays the robot's current pose on the LCD screen.
      */
     protected static void showData(INavigation navigation) {
-        Pose pose = navigation.getPose();
         LCD.clear();
 
-        LCD.drawString("X (cm): " + (pose.getX() * 100), 0, 0);
-        LCD.drawString("Y (cm): " + (pose.getY() * 100), 0, 1);
-        LCD.drawString("Phi: " + (pose.getHeading() / Math.PI * 180), 0, 2);
-        LCD.drawString("Lap: " + lapCounter, 0, 3);
-    }
-
-    /**
-     * Checks for lap completion by monitoring robot position.
-     */
-    private static void checkLapCompletion(INavigation navigation) {
-        Pose pose = navigation.getPose();
-        long currentTime = System.currentTimeMillis();
-
-        if (pose.getX() < 5 && pose.getY() < 5 && (currentTime - lastLapTime) > 5000) {
-            lastLapTime = currentTime; // Update last lap time
-            lapCounter++;
-            Sound.playTone(1000, 500); // Beep to indicate a new lap
-        }
-    }
-
-    /**
-     * Parks in the first suitable parking slot.
-     */
-    private static void parkInSlot(INavigation navigation, IControl control) {
-        ParkingSlot[] slots = navigation.getParkingSlots();
-        if (slots != null && slots.length > 0) {
-            for (ParkingSlot slot : slots) {
-                if (slot.getStatus() == ParkingSlot.ParkingSlotStatus.SUITABLE_FOR_PARKING) {
-                    float targetX = (slot.getBackBoundaryPosition().x + slot.getFrontBoundaryPosition().x) / 2;
-                    float targetY = (slot.getBackBoundaryPosition().y + slot.getFrontBoundaryPosition().y) / 2;
-
-                    control.setDestination(0, targetX, targetY);
-                    Sound.playTone(2000, 500); // Signal parking start
-
-                    while (true) {
-                        Pose pose = navigation.getPose();
-                        double distanceToTarget = Math.sqrt(
-                            Math.pow(targetX - pose.getX(), 2) + Math.pow(targetY - pose.getY(), 2)
-                        );
-
-                        if (distanceToTarget < 0.1) { // Threshold to consider parking complete
-                            break;
-                        }
-
-                        try {
-                            Thread.sleep(50); // Small delay to avoid busy waiting
-                        } catch (InterruptedException e) {
-                            System.out.println("Interrupted during parking");
-                        }
-                    }
-
-                    Sound.playTone(3000, 500); // Signal parking end
-                    return;
-                }
-            }
-        }
-        Sound.playTone(500, 500); // No suitable parking slot found
+        LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
+        LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
+        LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
     }
 }
