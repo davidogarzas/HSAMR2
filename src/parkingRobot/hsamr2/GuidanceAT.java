@@ -9,6 +9,8 @@ import lejos.nxt.LCD;
 
 import parkingRobot.IControl;
 import parkingRobot.IControl.ControlMode;
+import parkingRobot.INavigation.ParkingSlot;
+import parkingRobot.INavigation.ParkingSlot.ParkingSlotStatus;
 import parkingRobot.INavigation;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
@@ -18,7 +20,7 @@ import parkingRobot.IMonitor;
  * with specialization 'automation, measurement and control'.
  */
 public class GuidanceAT {
-
+	
     /**
      * States for the main finite state machine.
      */
@@ -72,7 +74,8 @@ public class GuidanceAT {
 
         // Main loop for handling robot states
         while (true) {
-            showData(navigation);
+            
+        	showData(navigation);
 
             switch (currentStatus) {
                 case SCOUT:
@@ -111,13 +114,7 @@ public class GuidanceAT {
 
         // Update navigation to process slot detection
         navigation.updateNavigation();
-
-        // Check for detected slots and beep if any are found
-        INavigation.ParkingSlot[] detectedSlots = navigation.getParkingSlots();
-        if (detectedSlots != null && detectedSlots.length > 0) {
-            Sound.playTone(1000, 200); // Beep for every slot detection
-        }
-
+        
         lastStatus = currentStatus;
 
         // Handle button transitions
@@ -161,33 +158,47 @@ public class GuidanceAT {
             }
         }
     }
-
+    
     /**
      * Handles the PARK mode logic.
      */
     private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
-
-        if (slots != null && slots.length > 0) {
-            INavigation.ParkingSlot targetSlot = slots[slots.length - 1]; // Use the last detected slot
+        	
+        	INavigation.ParkingSlot targetSlot = slots[0]; // Use the first mock slot for testing
+            control.setCtrlMode(ControlMode.LINE_CTRL); 
+            /*
             control.setDestination(
                 0, // Heading (angle)
                 targetSlot.getFrontBoundaryPosition().x,
                 targetSlot.getFrontBoundaryPosition().y
             );
-
-            control.setCtrlMode(ControlMode.PARK_CTRL);
-        } else {
-            // No slots available, return to SCOUT
-            currentStatus = CurrentStatus.SCOUT;
-        }
-
-        if (Button.ESCAPE.isDown()) {
-            currentStatus = CurrentStatus.EXIT;
-            while (Button.ESCAPE.isDown()) {
-                Thread.sleep(1); // Wait for button release
+*/
+            LCD.drawString("Slot ID: " + targetSlot.getID(), 0, 3);
+            LCD.drawString("BX: " + targetSlot.getBackBoundaryPosition().x * 100, 0, 4);
+            LCD.drawString("BY: " + targetSlot.getBackBoundaryPosition().y * 100, 0, 5);
+            LCD.drawString("FX: " + targetSlot.getFrontBoundaryPosition().x * 100, 0, 6);
+            LCD.drawString("FY: " + targetSlot.getFrontBoundaryPosition().y * 100, 0, 7);
+            
+            if (Math.abs(navigation.getPose().getX() - (targetSlot.getFrontBoundaryPosition().x + 0.1)) <= 0.01
+            		&& Math.abs(navigation.getPose().getY() - targetSlot.getFrontBoundaryPosition().y) <= 0.1){
+            	
+            	currentStatus = CurrentStatus.PAUSE;	
+            
             }
-        }
+            //control.setCtrlMode(ControlMode.PARK_CTRL);
+	        else {
+	            LCD.drawString("No slots found", 0, 3);
+	            Sound.buzz(); // Indicate failure
+	            currentStatus = CurrentStatus.SCOUT;
+	        }
+	
+	        if (Button.ESCAPE.isDown()) {
+	            currentStatus = CurrentStatus.EXIT;
+	            while (Button.ESCAPE.isDown()) {
+	                Thread.sleep(1); // Wait for button release
+	            }
+	        }
     }
 
     /**
@@ -213,5 +224,6 @@ public class GuidanceAT {
         LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
         LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
         LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
+        
     }
 }
