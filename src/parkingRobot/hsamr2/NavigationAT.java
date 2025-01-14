@@ -987,6 +987,7 @@ public class NavigationAT implements INavigation{
 					// Shouldnt be possible
 					//else {}	
 				}
+			}
 		}
 		
 		return;
