@@ -33,6 +33,8 @@ public interface INavigation {
 	 */
 	public void setDetectionState(boolean isOn);
 	
+	public void setUseOnlyOdometry(boolean isOn);
+	
 	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntLeft();
 	
 	public IPerception.AngleDifferenceMeasurement getAngleMeasuremntRight();

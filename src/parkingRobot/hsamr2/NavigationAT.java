@@ -35,6 +35,7 @@ import parkingRobot.hsamr2.NavigationThread;
 public class NavigationAT implements INavigation{
 	
 	boolean guidance_testing = false;
+	boolean useOnlyOdometry = false;
 	
 	// Global Odometry Variables
 	double w = 0; // angular velocity [rad/s]
@@ -272,6 +273,10 @@ public class NavigationAT implements INavigation{
 		this.parkingSlotDetectionIsOn = isOn;
 	}
 	
+	public void setUseOnlyOdometry(boolean isOn){
+		this.useOnlyOdometry = isOn;
+	}
+	
 	
 	// 	Class control
 	
@@ -411,9 +416,9 @@ public class NavigationAT implements INavigation{
 				this.time_turning = System.currentTimeMillis() - this.ref_time;
 				
 				if (this.onWhite){
-					if (this.time_turning >=100
-						&& Math.abs((angleResult - this.cornerTurnAngleResult)) >= 50
-						&& Math.abs(angleResult - this.nextLineAngle) <= 30){
+					if (this.time_turning >=50
+						&& Math.abs((angleResult - this.cornerTurnAngleResult)) >= 40
+						&& Math.abs(angleResult - this.nextLineAngle) <= 35){
 						
 						turn_corner = true;
 						this.cornerTurnxDistance = xResult - this.cornerTurnxResult;
@@ -673,14 +678,16 @@ public class NavigationAT implements INavigation{
 		// Calculates pose using odometry/ encoders 
 		pose_results = this.calculateOdometry();
 		
-		// Correction of pose after corner turn
-		pose_results = this.poseCorrectionCornerTurn(pose_results[0],pose_results[1],pose_results[2]);
-		
-		// Correction of pose according to lineSensors
-		pose_results = this.poseCorrectionLineSensors(pose_results[0],pose_results[1],pose_results[2]);
-		
-		// Correction of angle using SideDistanceSensors
-		pose_results = this.angleCorrectionSideDistanceSensors(pose_results[0],pose_results[1],pose_results[2]);
+		if (!useOnlyOdometry){
+			// Correction of pose after corner turn
+			pose_results = this.poseCorrectionCornerTurn(pose_results[0],pose_results[1],pose_results[2]);
+			
+			// Correction of pose according to lineSensors
+			pose_results = this.poseCorrectionLineSensors(pose_results[0],pose_results[1],pose_results[2]);
+			
+			// Correction of angle using SideDistanceSensors
+			pose_results = this.angleCorrectionSideDistanceSensors(pose_results[0],pose_results[1],pose_results[2]);
+		}
 		
 		// Updates global pose (used by other methods/ modules)
 		this.pose.setLocation((float)pose_results[0], (float)pose_results[1]); // [m]
@@ -701,44 +708,70 @@ public class NavigationAT implements INavigation{
 	private boolean saveParkingSlotCoordinate(int savePoint, double sensorDistanceFromCenter, double wallDistance, double lengthProjectedLine){
 		
 		Line projectedLine = new Line(  0,  0, 0,  0);
+		double xDistWithAngle = 0;
+		double yDistWithAngle = 0;
 		boolean validPoint = true;
+		
+		if (this.horizontalLine){
+			xDistWithAngle = (wallDistance/100)*Math.sin(Math.toRadians(this.angleAtMeasurement)); //m
+			yDistWithAngle = 0;
+		} else {
+			xDistWithAngle = 0;
+			yDistWithAngle = -(wallDistance/100)*Math.cos(Math.toRadians(this.angleAtMeasurement)); //m
+		}
 
 		// Saving Temporary Point
 		if (savePoint == 1){
 			this.temporaryPoint.setLocation(
-					this.pose.getX() + (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)), //m
-					this.pose.getY() + (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
+					this.pose.getX() 
+					+ (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)) //m
+					+ xDistWithAngle,
+					this.pose.getY() 
+					+ (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
+					+ yDistWithAngle
 					);				  
 		}
 		
 		// Saving Back Point
 		else if (savePoint == 2){
 			this.parkingSlotBackPoint.setLocation(
-					this.pose.getX() + (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)), //m
-					this.pose.getY() + (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
-					);				  
+					this.pose.getX() 
+					+ (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)) //m
+					+ xDistWithAngle,
+					this.pose.getY() 
+					+ (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
+					+ yDistWithAngle
+					);					  
 		}
 		
 		// Saving Front Point
 		else if (savePoint == 3){
 			this.parkingSlotFrontPoint.setLocation(
-					this.pose.getX() + (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)), //m
-					this.pose.getY() + (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
+					this.pose.getX() 
+					+ (sensorDistanceFromCenter/100)*Math.cos(Math.toRadians(this.currentLineAngle)) //m
+					+ xDistWithAngle,
+					this.pose.getY() 
+					+ (sensorDistanceFromCenter/100)*Math.sin(Math.toRadians(this.currentLineAngle)) //m
+					+ yDistWithAngle
 					);				  
 		}
 		
 		projectedLine.setLine(
 				// X1
-				this.pose.getX()*100 + (sensorDistanceFromCenter + lengthProjectedLine/2)*Math.cos(Math.toRadians(this.currentLineAngle))
+				this.pose.getX()*100 
+					+ (sensorDistanceFromCenter + lengthProjectedLine/2)*Math.cos(Math.toRadians(this.currentLineAngle))
 					+ wallDistance*Math.sin(Math.toRadians(this.currentLineAngle)), 
 				//Y1
-				this.pose.getY()*100 + (sensorDistanceFromCenter + lengthProjectedLine/2)*Math.sin(Math.toRadians(this.currentLineAngle))
+				this.pose.getY()*100 
+					+ (sensorDistanceFromCenter + lengthProjectedLine/2)*Math.sin(Math.toRadians(this.currentLineAngle))
 					- wallDistance*Math.cos(Math.toRadians(this.currentLineAngle)), 
 				//X2
-				this.pose.getX()*100 + (sensorDistanceFromCenter - lengthProjectedLine/2)*Math.cos(Math.toRadians(this.currentLineAngle))
+				this.pose.getX()*100 
+					+ (sensorDistanceFromCenter - lengthProjectedLine/2)*Math.cos(Math.toRadians(this.currentLineAngle))
 					+ wallDistance*Math.sin(Math.toRadians(this.currentLineAngle)), 
 				//Y2
-				this.pose.getY()*100 + (sensorDistanceFromCenter - lengthProjectedLine/2)*Math.sin(Math.toRadians(this.currentLineAngle))
+				this.pose.getY()*100 
+					+ (sensorDistanceFromCenter - lengthProjectedLine/2)*Math.sin(Math.toRadians(this.currentLineAngle))
 					- wallDistance*Math.cos(Math.toRadians(this.currentLineAngle)) 
 				);
 		
@@ -786,8 +819,8 @@ public class NavigationAT implements INavigation{
 		double minSizeParkingSpace = 10; //cm
 		double sizeParkingSpace = 45; //cm
 		double allowedError = 10; //cm
-		double wallDistanceLowerThreshhold = 12; //cm
-		double wallDistanceUpperThreshhold = 17; //cm
+		double wallDistanceLowerThreshhold = 10.5; //cm
+		double wallDistanceUpperThreshhold = 15; //cm
 		
 		int indexBackPoint = 0;
 		int indexFrontPoint = 0;
@@ -834,8 +867,8 @@ public class NavigationAT implements INavigation{
 				else if (this.frontSideSensorDistance >= wallDistanceUpperThreshhold
 						&& this.backSideSensorDistance >= wallDistanceUpperThreshhold){
 					
-					// Detects slot for 10 readings and goes to next state
-					if (this.parkingSlotStateCounter < 10){
+					// Detects slot for 5 readings and goes to next state
+					if (this.parkingSlotStateCounter < 5){
 												
 						// Saves first time point was found
 						if (this.parkingSlotStateCounter == 0){
@@ -882,9 +915,9 @@ public class NavigationAT implements INavigation{
 		// Detects with BS Sensor and compares point with the one measured with FS Sensor
 		else if (this.parking_slot_state == 1){
 			
-			// Detects wall for 10 readings and goes to state 0
+			// Detects wall for 3 readings and goes to state 0 (First reading was off, robot was inclined)
 			if (this.frontSideSensorDistance <= wallDistanceUpperThreshhold){
-				if (this.wallStateCounter < 10){this.wallStateCounter++;}
+				if (this.wallStateCounter < 3){this.wallStateCounter++;}
 				else {
 					this.wallStateCounter = 0;
 					this.parking_slot_state = 0;
@@ -915,7 +948,7 @@ public class NavigationAT implements INavigation{
 					if (validPoint){
 						
 						// Points are different (1st Point measured late -> BS is more reliable)
-						if (this.parkingSlotBackPoint.distance(this.temporaryPoint) >= 0.05){
+						if (this.parkingSlotBackPoint.distance(this.temporaryPoint) >= 0.075){
 
 							// Compares BackPoint and TemporaryPoint
 							monitor.writeNavigationComment("Back Point Compared");
