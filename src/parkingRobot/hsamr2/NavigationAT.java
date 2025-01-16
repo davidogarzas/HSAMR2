@@ -34,7 +34,7 @@ import parkingRobot.hsamr2.NavigationThread;
 
 public class NavigationAT implements INavigation{
 	
-	boolean guidance_testing = false;
+	boolean guidance_testing = true;
 	
 	// Global Odometry Variables
 	double w = 0; // angular velocity [rad/s]
