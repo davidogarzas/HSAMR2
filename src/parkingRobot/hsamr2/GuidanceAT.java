@@ -91,6 +91,7 @@ public class GuidanceAT {
         if (lastStatus != CurrentStatus.SCOUT) {
             control.setCtrlMode(ControlMode.LINE_CTRL);
             navigation.setDetectionState(true);
+            navigation.setUseOnlyOdometry(true);
         }
 
         navigation.updateNavigation();
@@ -136,38 +137,16 @@ public class GuidanceAT {
     }
 
     private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
+    	//disable odometry to avoid conflicts
+    	 navigation.setUseOnlyOdometry(false);
         // Get all available parking slots
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
 
-        if (slots != null && slots.length > 0) {
+       /* if (slots != null && slots.length > 0) {
             // Select the first slot as the target (or implement a selection mechanism if needed)
             INavigation.ParkingSlot targetSlot = slots[0];
-            
-            // Define the target coordinates for the front boundary
-            double frontBoundaryX = targetSlot.getFrontBoundaryPosition().x;
-            double frontBoundaryY = targetSlot.getFrontBoundaryPosition().y;
 
-            // Display target slot details on LCD
-            LCD.clear();
-            LCD.drawString("Parking Slot ID: " + targetSlot.getID(), 0, 3);
-            LCD.drawString("Front X: " + (frontBoundaryX * 100) + " cm", 0, 4);
-            LCD.drawString("Front Y: " + (frontBoundaryY * 100) + " cm", 0, 5);
-
-            // Step 1: Drive to the front boundary position
-            control.setDestination(0, frontBoundaryX, frontBoundaryY);
-
-            // Wait until the robot reaches the front boundary position
-            while (Math.abs(navigation.getPose().getX() - frontBoundaryX) > 0.1
-                    || Math.abs(navigation.getPose().getY() - frontBoundaryY) > 0.1) {
-                navigation.updateNavigation();
-                Thread.sleep(100); // Allow time for movement and updates
-            }
-
-            // Stop at the front boundary
-            control.setCtrlMode(IControl.ControlMode.INACTIVE); // Pause robot motion
-            Sound.beepSequenceUp(); // Provide feedback
-
-            // Step 2: Calculate the middle point
+            // Step 1: Calculate the middle point
             double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
             double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
 
@@ -176,7 +155,7 @@ public class GuidanceAT {
             LCD.drawString("Middle X: " + (middleX * 100) + " cm", 0, 3);
             LCD.drawString("Middle Y: " + (middleY * 100) + " cm", 0, 4);
 
-            // Step 3: Drive backward to the middle point
+            // Step 2: Drive directly towards the middle point
             control.setDestination(0, middleX, middleY);
 
             // Wait until the robot reaches the middle point
@@ -184,13 +163,50 @@ public class GuidanceAT {
                     || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
                 navigation.updateNavigation();
                 Thread.sleep(100); // Allow time for movement and updates
-            }
+            }*/
 
-            // Parking sequence complete
-            Sound.beepSequence(); // Feedback to indicate parking completion
-            currentStatus = CurrentStatus.PAUSE; // Transition to PAUSE mode
+            // Parking sequence complete: Robot reaches middle point
+            //Sound.beepSequenceUp(); // Feedback to indicate reaching the middle point
 
-        } else {
+         // Step 3: Perform a 90-degree turn
+            LCD.clear();
+            LCD.drawString("Turning 90 degrees", 0, 3);
+
+            // Get the current heading
+            double initialHeading = navigation.getPose().getHeading();
+
+            // Desired heading after a 90 degree turn (in radians)
+            double targetHeading = initialHeading + Math.PI / 2;
+            /*if (targetHeading > 2 * Math.PI) {
+                targetHeading -= 2 * Math.PI; // Ensure heading stays within [0, 2pi]
+            }*/
+
+            // Stop any ongoing control to take direct control of the motors
+            control.setCtrlMode(IControl.ControlMode.INACTIVE); 
+
+            // Access motors directly
+            NXTMotor leftMotor = ((ControlRST) control).leftMotor; 
+            NXTMotor rightMotor = ((ControlRST) control).rightMotor;
+
+            // Set motors for turning: Keep the left motor stationary and rotate the right motor
+            leftMotor.setPower(0); // stop the left motor
+            rightMotor.setPower(40); // Set power to the right motor
+            rightMotor.forward(); // Start turning the robot
+
+            // Keep turning until the robot reaches the target heading or timeout
+            /*while ((Math.abs(navigation.getPose().getHeading() - targetHeading) > 0.05)) {
+                navigation.updateNavigation(); // Update the navigation to get the latest pose
+                Thread.sleep(50); // Allow time for pose updates
+            }*/
+
+            // Stop the motors after turning
+           // leftMotor.stop();
+            //rightMotor.stop();
+
+ 
+           // Sound.beepSequence(); // Feedback to indicate turn completion
+            //LCD.drawString("Turn Complete", 0, 6);
+     /*   } else {
             // No parking slots available
             LCD.drawString("No parking slots detected!", 0, 3);
         }
@@ -201,7 +217,7 @@ public class GuidanceAT {
             while (Button.ESCAPE.isDown()) {
                 Thread.sleep(1); // Wait for button release
             }
-        }
+        }*/
     }
 
     public static CurrentStatus getCurrentStatus() {
@@ -217,28 +233,5 @@ public class GuidanceAT {
         LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
         LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
         LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
-    }
-
-    /**
-     * Generates a 3rd-degree trajectory for parking.
-     */
-    static class TrajectoryGenerator {
-        private double a, b, c, d;
-        private double startX, startY, endX, endY;
-
-        public TrajectoryGenerator(double startX, double startY, double endX, double endY) {
-            this.startX = startX;
-            this.startY = startY;
-            this.endX = endX;
-            this.endY = endY;
-
-        }
-
-        public double[] getNextPoint(double currentX) {
-            double nextX = currentX - 0.05; // Move backward
-            double nextY = a * Math.pow((nextX - startX), 3) + b * Math.pow((nextX - startX), 2) + c * (nextX - startX) + d;
-
-            return new double[]{nextX, nextY};
-        }
     }
 }
