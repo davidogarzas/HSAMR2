@@ -71,7 +71,7 @@ public class GuidanceAT {
                     break;
 
                 case PARK:
-                    handleParkMode(navigation, perception, control); // Pass perception here
+                    handleParkMode(navigation, control); // Pass perception here
                     break;
 
                 case EXIT:
@@ -135,68 +135,67 @@ public class GuidanceAT {
         }
     }
 
-    private static void handleParkMode(INavigation navigation, IPerception perception, IControl control) throws InterruptedException {
+    private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
+        // Get all available parking slots
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
 
         if (slots != null && slots.length > 0) {
-            // Select the first parking slot for demonstration
+            // Select the first slot as the target (or implement a selection mechanism if needed)
             INavigation.ParkingSlot targetSlot = slots[0];
-            double targetX = targetSlot.getFrontBoundaryPosition().x + 0.1; // Move 10 cm forward from the slot
-            double targetY = targetSlot.getFrontBoundaryPosition().y;
+            
+            // Define the target coordinates for the front boundary
+            double frontBoundaryX = targetSlot.getFrontBoundaryPosition().x;
+            double frontBoundaryY = targetSlot.getFrontBoundaryPosition().y;
 
-            // Display parking slot details
-            LCD.drawString("Slot ID: " + targetSlot.getID(), 0, 3);
-            LCD.drawString("BX: " + targetSlot.getBackBoundaryPosition().x * 100, 0, 4);
-            LCD.drawString("BY: " + targetSlot.getBackBoundaryPosition().y * 100, 0, 5);
-            LCD.drawString("FX: " + targetSlot.getFrontBoundaryPosition().x * 100, 0, 6);
-            LCD.drawString("FY: " + targetSlot.getFrontBoundaryPosition().y * 100, 0, 7);
+            // Display target slot details on LCD
+            LCD.clear();
+            LCD.drawString("Parking Slot ID: " + targetSlot.getID(), 0, 3);
+            LCD.drawString("Front X: " + (frontBoundaryX * 100) + " cm", 0, 4);
+            LCD.drawString("Front Y: " + (frontBoundaryY * 100) + " cm", 0, 5);
 
-            // Move forward 10 cm (always)
-            control.setDestination(0, targetX, targetY);
-            while (Math.abs(navigation.getPose().getX() - targetX) > 0.01 || Math.abs(navigation.getPose().getY() - targetY) > 0.01) {
-                // Check for collisions
-                if (perception.getBackSensorDistance() < 0.1 || perception.getFrontSensorDistance() < 0.1) { // 10 cm
-                    Sound.twoBeeps(); // Collision warning
-                    currentStatus = CurrentStatus.PAUSE;
-                    return; // Exit the parking logic if a collision is imminent
-                }
-                Thread.sleep(50); // Allow time for the robot to adjust position
+            // Step 1: Drive to the front boundary position
+            control.setDestination(0, frontBoundaryX, frontBoundaryY);
+
+            // Wait until the robot reaches the front boundary position
+            while (Math.abs(navigation.getPose().getX() - frontBoundaryX) > 0.1
+                    || Math.abs(navigation.getPose().getY() - frontBoundaryY) > 0.1) {
+                navigation.updateNavigation();
+                Thread.sleep(100); // Allow time for movement and updates
             }
 
-            // Beep to signal reaching 10 cm forward
-            Sound.beep();
+            // Stop at the front boundary
+            control.setCtrlMode(IControl.ControlMode.INACTIVE); // Pause robot motion
+            Sound.beepSequenceUp(); // Provide feedback
 
-            // Now execute the parking logic using TrajectoryGenerator
-            double startX = navigation.getPose().getX();
-            double startY = navigation.getPose().getY();
-            double endX = targetSlot.getBackBoundaryPosition().x;
-            double endY = targetSlot.getBackBoundaryPosition().y;
+            // Step 2: Calculate the middle point
+            double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
+            double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
 
-            TrajectoryGenerator trajectory = new TrajectoryGenerator(startX, startY, endX, endY);
+            // Display middle point details on LCD
+            LCD.clear();
+            LCD.drawString("Middle X: " + (middleX * 100) + " cm", 0, 3);
+            LCD.drawString("Middle Y: " + (middleY * 100) + " cm", 0, 4);
 
-            double currentX = startX;
-            while (Math.abs(currentX - endX) > 0.01) { // Loop until close to the parking end position
-                double[] nextPoint = trajectory.getNextPoint(currentX);
-                control.setDestination(0, nextPoint[0], nextPoint[1]); // Set the next trajectory point
-                currentX = nextPoint[0];
+            // Step 3: Drive backward to the middle point
+            control.setDestination(0, middleX, middleY);
 
-                // Check for collisions
-                if (perception.getBackSensorDistance() < 0.1 || perception.getFrontSensorDistance() < 0.1) { // 10 cm
-                    Sound.twoBeeps(); // Collision warning
-                    currentStatus = CurrentStatus.PAUSE;
-                    return;
-                }
-                Thread.sleep(50); // Small delay for smooth motion
+            // Wait until the robot reaches the middle point
+            while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
+                    || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
+                navigation.updateNavigation();
+                Thread.sleep(100); // Allow time for movement and updates
             }
 
-            // Signal that parking is complete
-            currentStatus = CurrentStatus.PAUSE;
-            Sound.beep();
+            // Parking sequence complete
+            Sound.beepSequence(); // Feedback to indicate parking completion
+            currentStatus = CurrentStatus.PAUSE; // Transition to PAUSE mode
+
         } else {
-            LCD.drawString("No slots available", 0, 3);
+            // No parking slots available
+            LCD.drawString("No parking slots detected!", 0, 3);
         }
 
-        // Allow user to exit the parking mode
+        // Allow the user to exit PARK mode
         if (Button.ESCAPE.isDown()) {
             currentStatus = CurrentStatus.EXIT;
             while (Button.ESCAPE.isDown()) {
