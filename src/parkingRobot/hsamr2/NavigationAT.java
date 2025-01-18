@@ -34,21 +34,41 @@ import parkingRobot.hsamr2.NavigationThread;
 
 public class NavigationAT implements INavigation{
 	
+	// For other modules
 	boolean guidance_testing = false;
 	boolean useOnlyOdometry = false;
-	boolean goingStraight = false;
 	
-	// Global Odometry Variables
-	double w = 0; // angular velocity [rad/s]
-	
-	// Custom Variables
-	int currentLine = 0;
-	boolean horizontalLine = false;
+	// Map Variables
 	int lapNumber = 0;
+	int currentLine = 0;
+	
+	float[] mapLineAngles = {0,0,0,0,0,0,0,0};
 	double currentLineAngle = 0;
 	double nextLineAngle = 0;
-	double currentLineX = 0;
-	double currentLineY = 0;
+	
+	double constantX = 0;
+	double constantY = 0;
+	double lineFinalX = 0;
+	double lineFinalY = 0;
+
+	boolean horizontalLine = false;
+
+	// Corner Detection Variables
+	int stateCornerTurn = 0;
+	long turnTimeRef = 0;
+	long turnTime = 0;
+	double cornerTurnAngleResult = 0;
+	boolean onWhite 	= false;
+
+	// Angle Correction Variables
+	int angleCorrectionState = 0;
+	long angleCorrectionRefTime = 0;
+
+	// Parking Slot Variables
+
+	boolean goingStraight = false;
+		
+	// Custom Variables
 	long parkingSlotTime = 0;
 	int lineAtMeasurement = 0;
 	int freeSpaceCounter = 0;
@@ -60,21 +80,6 @@ public class NavigationAT implements INavigation{
 	
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
 	LinkedList<ParkingSlot> parkingSlotsListTest = new LinkedList<ParkingSlot>();
-
-	float[] mapLineAngles = {0,0,0,0,0,0,0,0};
-	
-	int stateCornerTurn = 0;
-	int angleCorrectionState = 0;
-	long ref_time_coords = 0;
-	long ref_time = 0;
-	long time_turning = 0;
-	double cornerTurnAngleResult = 0;
-	double cornerTurnxResult = 0;
-	double cornerTurnyResult = 0;
-	double cornerTurnxDistance = 0;
-	double cornerTurnyDistance = 0;
-	// 0 = both white
-	// 1 = different
 	
 	// For parkingSlots
 	float measurementQualityEncoders = 100;
@@ -98,7 +103,6 @@ public class NavigationAT implements INavigation{
 	 */
 	int lineSensorRight	=	0;
 	int lineSensorLeft	=	0;
-	boolean onWhite 	= false;
 		
 	/**
 	 * reference to {@link IPerception.EncoderSensor} class for robot wheels which 
@@ -268,6 +272,8 @@ public class NavigationAT implements INavigation{
 	 */
 	public void setMap(Line[] map){
 		this.map = map;		
+		
+		
 	}
 	
 	/* (non-Javadoc)
@@ -331,112 +337,42 @@ public class NavigationAT implements INavigation{
 		}
 	}
 	
-	private void updateMapVariables(){
-		
-		// Updates Current Line Angle (the angle of the current line)
-		this.currentLineAngle = this.mapLineAngles[this.currentLine];
-		
-		// Updates Next Line Angle (the angle of the next line)
-		if (this.currentLine < this.map.length - 1){this.nextLineAngle = this.mapLineAngles[this.currentLine + 1];} 
-		else {this.nextLineAngle = this.mapLineAngles[0];}
-		
-		// Updates type of line
-		this.horizontalLine = this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2();
-		if (this.horizontalLine) {this.currentLineY = this.map[this.currentLine].getY1();} //cm
-		else if (!this.horizontalLine) {this.currentLineX = this.map[this.currentLine].getX1();} //cm
-	}
-	
-	private boolean detectCorner(double xResult, double yResult, double angleResult, int method){
+	private boolean detectCorner(double xResult, double yResult, double angleResult){
 		
 		boolean turn_corner = false;
-		
-		// Method 1
-		// Detect corner when the change in angle is big enough while a line sensor detects black
-		if (method == 1){
-			if (this.stateCornerTurn == 0){
-				if (!this.onWhite){
-					this.stateCornerTurn = 1;
-					this.cornerTurnAngleResult = angleResult;
-				}
-			} 
-			
-			else if (this.stateCornerTurn == 1){
-				if (this.onWhite){
-					this.stateCornerTurn = 0;
-					if (Math.abs((angleResult - this.cornerTurnAngleResult)) >= 70){
-						turn_corner = true; 
-					}
-					this.cornerTurnAngleResult = angleResult;
-				}
-			}
-		}
-		
-		// Method 2
-		// Detects corner when a lineSensor has detected black for a certain time period
-		else if (method == 2){
-			if (this.stateCornerTurn == 0){
-				if (!this.onWhite){
-					this.stateCornerTurn = 1;
-					this.ref_time = System.currentTimeMillis();
-				}
-			} 
-			
-			else if (this.stateCornerTurn == 1){
-				if (this.onWhite){
-					this.stateCornerTurn = 0;
-					if (Math.abs((System.currentTimeMillis() - this.ref_time)) >= 200){
-						turn_corner = true; 
-					}
-					this.ref_time = System.currentTimeMillis();
-				}
-			}
-		}
-		
-		// Method 3
-		// Detects change of line/ corner turn 
-		// when it is 20� from reaching the desired angle of the next line	
-		else if (method == 3){
-			if (Math.abs(angleResult - this.nextLineAngle) <= 20){
-				turn_corner = true;
-			}
-		}
-		
+					
 		// Method 4
 		// Combines method 1, 2 and 3
 		// Allows for each of the 'components' to be less strict on their own
-		else if (method == 4){
-			if (this.stateCornerTurn == 0){
-				if (!this.onWhite){
-					this.stateCornerTurn = 1;
-					this.ref_time = System.currentTimeMillis();
-					this.cornerTurnAngleResult = angleResult;
-					this.cornerTurnxResult = xResult;
-					this.cornerTurnyResult = yResult;
-				}
-			} 
+		if (this.stateCornerTurn == 0){
+			if (!this.onWhite){
+				this.stateCornerTurn = 1;
+				this.turnTimeRef = System.currentTimeMillis();
+				this.cornerTurnAngleResult = angleResult;
+			}
+		} 
+		
+		else if (this.stateCornerTurn == 1){
 			
-			else if (this.stateCornerTurn == 1){
-				
-				this.time_turning = System.currentTimeMillis() - this.ref_time;
-				
-				if (this.onWhite){
-					if (this.time_turning >=50
-						&& Math.abs((angleResult - this.cornerTurnAngleResult)) >= 40
-						&& Math.abs(angleResult - this.nextLineAngle) <= 35){
-						
-						turn_corner = true;
-						this.wallDistanceAverageSum = 0;
-						this.wallDistanceAverageCounter = 0;
-						this.wallDistanceAverage = 0;
-					}
+			this.turnTime = System.currentTimeMillis() - this.turnTimeRef;
+			
+			if (this.onWhite){
+				if (this.turnTime >= 50
+					&& Math.abs((angleResult - this.cornerTurnAngleResult)) >= 40
+					&& Math.abs(angleResult - this.nextLineAngle) <= 35
+					&& Math.abs(xResult*100 - this.lineFinalX) <= 25
+					&& Math.abs(yResult*100 - this.lineFinalY) <= 25){
 					
-					this.stateCornerTurn = 0;
-					this.ref_time = System.currentTimeMillis();
-					this.time_turning = 0;
-					this.cornerTurnAngleResult = angleResult;
-					this.cornerTurnxResult = xResult;
-					this.cornerTurnyResult = yResult;
+					turn_corner = true;
+					this.wallDistanceAverageSum = 0;
+					this.wallDistanceAverageCounter = 0;
+					this.wallDistanceAverage = 0;
 				}
+				
+				this.stateCornerTurn = 0;
+				this.turnTimeRef = System.currentTimeMillis();
+				this.turnTime = 0;
+				this.cornerTurnAngleResult = angleResult;
 			}
 		}
 
@@ -482,7 +418,7 @@ public class NavigationAT implements INavigation{
 
 		double vLeft		= (leftAngleSpeed  * Math.PI * LEFT_WHEEL_RADIUS ) / 180 ; //velocity of left  wheel in m/s
 		double vRight		= (rightAngleSpeed * Math.PI * RIGHT_WHEEL_RADIUS) / 180 ; //velocity of right wheel in m/s		
-		this.w 				= (vRight - vLeft) / WHEEL_DISTANCE; //angular velocity of robot in rad/s
+		double w 			= (vRight - vLeft) / WHEEL_DISTANCE; //angular velocity of robot in rad/s
 		
 		Double R 			= new Double(( WHEEL_DISTANCE / 2 ) * ( (vLeft + vRight) / (vRight - vLeft) ));								
 		
@@ -536,10 +472,10 @@ public class NavigationAT implements INavigation{
 		if (this.onWhite){
 			
 			// Corrects X if line is horizontal
-			if (this.horizontalLine){yResult = this.currentLineY/100;} //m
+			if (this.horizontalLine){yResult = this.constantY/100;} //m
 				
 			// Corrects Y if line is vertical
-			else if (!this.horizontalLine){xResult = this.currentLineX/100;} //m
+			else if (!this.horizontalLine){xResult = this.constantX/100;} //m
 		}
 		
 		// Correction for angle
@@ -548,7 +484,7 @@ public class NavigationAT implements INavigation{
 			// Both Line Sensors Detect White
 			if (this.onWhite){
 				this.angleCorrectionState = 1;
-				this.ref_time_coords = System.currentTimeMillis();
+				this.angleCorrectionRefTime = System.currentTimeMillis();
 			}
 		}
 		
@@ -557,13 +493,13 @@ public class NavigationAT implements INavigation{
 			// One of the Line Sensors doesnt detect White (Robot is not going straight)
 			if (!this.onWhite){
 				this.angleCorrectionState = 0;
-				this.ref_time_coords = System.currentTimeMillis();
+				this.angleCorrectionRefTime = System.currentTimeMillis();
 			}
 			
 			// 2 seconds have passed with robot going straight
-			else if (Math.abs(System.currentTimeMillis() - this.ref_time_coords) >= 2000){
+			else if (Math.abs(System.currentTimeMillis() - this.angleCorrectionRefTime) >= 2000){
 				this.angleCorrectionState = 0;
-				this.ref_time_coords = System.currentTimeMillis();
+				this.angleCorrectionRefTime = System.currentTimeMillis();
 				
 				// Corrects angle to currentLineAngle
 				angleResult = this.currentLineAngle;
@@ -579,70 +515,57 @@ public class NavigationAT implements INavigation{
 		return pose_results;
 	}
 	
-	private double[] poseCorrectionCornerTurn(double xResult, double yResult, double angleResult){
+	private void onNewLine(){
 		
-		double[] pose_results = new double[3];
-		double xMap	= 0;
-		double yMap	= 0;
+		// Updates angle of finished line (on next lap, it will need +360�)
+		this.mapLineAngles[this.currentLine] += 360;
 		
-		boolean turn_corner = this.detectCorner(xResult,yResult,angleResult,4);
+		// Updates Current Line Index of the Map
+		// Increases counter by one as long as the robot wasn't on the last line
+		if (this.currentLine < this.map.length - 1){this.currentLine++;}
+		
+		// Resets line number and increases lap number if the robot finished the last line
+		else {
+			this.currentLine = 0;
+			this.lapNumber++;
+		}
+	}
+	
+	private void updateMapVariables(){
+		
+		// Updates Current Line Angle (the angle of the current line)
+		this.currentLineAngle = this.mapLineAngles[this.currentLine];
+		
+		// Updates Next Line Angle (the angle of the next line)
+		if (this.currentLine < this.map.length - 1){this.nextLineAngle = this.mapLineAngles[this.currentLine + 1];} 
+		else {this.nextLineAngle = this.mapLineAngles[0];}
+		
+		// Updates type of line
+		this.horizontalLine = this.map[this.currentLine].getY1() == this.map[this.currentLine].getY2();
+		if (this.horizontalLine) {this.constantY = this.map[this.currentLine].getY1();} //cm
+		else if (!this.horizontalLine) {this.constantX = this.map[this.currentLine].getX1();} //cm
+		
+		// Updates lineFinalX and lineFinalY of line
+		this.lineFinalX = this.map[this.currentLine].getX2(); //cm
+		this.lineFinalY = this.map[this.currentLine].getY2(); //cm
+		
+		// Resets MeasurementQuality
+		this.measurementQualityEncoders = 100;
+	}
+	
+	private void mapLocalization(double xResult, double yResult, double angleResult){
+				
+		// Detects corner turn
+		boolean turn_corner = this.detectCorner(xResult, yResult, angleResult);
 		
 		if (turn_corner){
 			
-			// Updates angle of finished line (on next lap, it will need +360�)
-			this.mapLineAngles[this.currentLine] += 360;
+			// Updates CurrentLine, Lap Number and lineAngle of finished line
+			this.onNewLine();
 			
-			// Updates Current Line Index of the Map
-			// Increases counter by one as long as the robot wasn't on the last line
-			if (this.currentLine < this.map.length - 1){this.currentLine++;}
-			
-			// Resets line number and increases lap number if the robot finished the last line
-			else {
-				this.currentLine = 0;
-				this.lapNumber++;
-			}
-			
+			// Updates the rest of the map variables
 			this.updateMapVariables();
-			
-			// Gets X Y from Map Coordinates
-			xMap = this.map[currentLine].getX1();  // cm
-			yMap = this.map[currentLine].getY1();  // cm
-			
-			// Considers the distance covered on X or Y while making the corner turn
-			if (this.horizontalLine) {xMap += this.cornerTurnxDistance*100;} //cm
-			else if (!this.horizontalLine) {yMap += this.cornerTurnyDistance*100;} //cm
-			
-			// Considers the turning radius of robot for coordinate correction
-			//xMap += 5*Math.cos(this.currentLineAngle * Math.PI/180);
-			//yMap += 5*Math.sin(this.currentLineAngle * Math.PI/180);
-			
-			// Plays sound
-			//Sound.playTone(130,100); // C3
-			
-			/*
-			// Prints info
-			monitor.writeNavigationComment("Now on Line " + currentLine);
-			monitor.writeNavigationComment("Lap: " + this.lapNumber);
-			monitor.writeNavigationComment("Estimated X: " + String.valueOf(xResult * 100) + " Y: " + String.valueOf(yResult * 100));
-			monitor.writeNavigationComment("Map X: " + String.valueOf(xMap) + " Y: " + String.valueOf(yMap));
-			monitor.writeNavigationComment("Current Line Angle: " + this.currentLineAngle);
-			monitor.writeNavigationComment("Next Line Angle: " + this.nextLineAngle);
-			*/
-			
-			// Updates X Y to Map Coordinates
-			//xResult = xMap / 100; // m
-			//yResult = yMap / 100; // m
-			
-			// Resets MeasurementQuality
-			this.measurementQualityEncoders = 100;
 		}
-		
-		// Packs into array
-		pose_results[0] = xResult;
-		pose_results[1] = yResult;
-		pose_results[2] = angleResult;
-		
-		return pose_results;
 	}
 	
 	private double[] angleCorrectionSideDistanceSensors(double xResult, double yResult, double angleResult){
@@ -691,8 +614,8 @@ public class NavigationAT implements INavigation{
 		pose_results = this.calculateOdometry();
 		
 		if (!useOnlyOdometry){
-			// Correction of pose after corner turn
-			pose_results = this.poseCorrectionCornerTurn(pose_results[0],pose_results[1],pose_results[2]);
+			// Localization of robot in map
+			this.mapLocalization(pose_results[0], pose_results[1], pose_results[2]);
 			
 			// Correction of pose according to lineSensors
 			pose_results = this.poseCorrectionLineSensors(pose_results[0],pose_results[1],pose_results[2]);
@@ -812,8 +735,8 @@ public class NavigationAT implements INavigation{
 		double measurementQualityPose = 0;  // 10 cm is max error	
 		
 		// Quality based on error from expected X or Y coordinate
-		if (this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getY()*100 - this.currentLineY)*100/10;}
-		else if (!this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getX()*100 - this.currentLineX)*100/10;}
+		if (this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getY()*100 - this.constantY)*100/10;}
+		else if (!this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getX()*100 - this.constantX)*100/10;}
 		
 		// Quality based on angle at time of measurement (30� is max error)
 		measurementQualityAngle = 100 - (Math.abs(angleAtMeasurement-this.currentLineAngle))*100/30;
