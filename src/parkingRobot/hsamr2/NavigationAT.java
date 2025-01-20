@@ -83,7 +83,7 @@ public class NavigationAT implements INavigation{
 	
 	// For parkingSlots
 	float measurementQualityEncoders = 100;
-	double measurementQualityDistanceFactor = 0.05;
+	double measurementQualityDistanceFactor = 0.25;
 	float measurementQualityBack = 100;
 	float measurementQualityFront = 100;
 
@@ -583,7 +583,7 @@ public class NavigationAT implements INavigation{
 			&& Math.abs(this.frontSideSensorDistance - this.backSideSensorDistance) <= 1
 			
 			// If difference between angleResult and currentLineAngle (desired angle) is too big
-			&& Math.abs(this.currentLineAngle - angleResult) >= 5){
+			&& Math.abs(this.currentLineAngle - angleResult) >= 15){
 					
 				// Plays sound
 				//Sound.playTone(523,100); //C5
@@ -798,7 +798,7 @@ public class NavigationAT implements INavigation{
 		// Avoids corners
 		if (this.lineAtMeasurement != this.currentLine){
 			this.parking_slot_state = 0;
-			monitor.writeNavigationComment("To state: " + this.parking_slot_state);
+			//monitor.writeNavigationComment("To state: " + this.parking_slot_state);
 
 			this.freeSpaceCounter = 0;
 			this.wallCounter = 0;
@@ -901,7 +901,7 @@ public class NavigationAT implements INavigation{
 				else {wallCounter++;}
 			}
 							
-			if (freeSpaceCounter == 5){
+			if (freeSpaceCounter == 20){
 				this.parking_slot_state = 2;
 				monitor.writeNavigationComment("To state: " + this.parking_slot_state);
 
@@ -1039,7 +1039,15 @@ public class NavigationAT implements INavigation{
 			
 			// Calculates size of space
 			sizeMeasured = this.parkingSlotFrontPoint.distance(this.parkingSlotBackPoint)*100; //cm
-								
+			monitor.writeNavigationComment("Exact Size: " + sizeMeasured);
+
+			quality = (int) ((this.measurementQualityBack + this.measurementQualityFront)/2);
+			monitor.writeNavigationComment("Quality: " + quality);
+			
+			// Quality 0 = +/- 15 cm max error
+			sizeMeasured += (15 - quality*0.1);
+			monitor.writeNavigationComment("Size with quality: " + sizeMeasured);
+			
 			if (sizeMeasured >= minSizeParkingSpace){
 		
 				// Plays sound
@@ -1048,7 +1056,6 @@ public class NavigationAT implements INavigation{
 				if (sizeMeasured >= sizeParkingSpace){parkingSlotStatus = ParkingSlotStatus.SUITABLE_FOR_PARKING;} 
 				else {parkingSlotStatus = ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING;}
 				
-				quality = (int) ((this.measurementQualityBack + this.measurementQualityFront)/2);
 				monitor.writeNavigationComment("Quality: " + quality);
 
 				// Look through array of saved slots
