@@ -408,8 +408,8 @@ public class ControlRST implements IControl {
 
         switch (status) {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
-            	KpLeft = 0.01; KiLeft = 0.3; KdLeft = 1;
-            	KpRight = 0.01; KiRight = 0.5; KdRight = 1;
+            	KpLeft = 0.005; KiLeft = 1.3; KdLeft = 0.8;
+            	KpRight = 0.006; KiRight = 1.2; KdRight = 0.6;
                 drive(10, 0); // Velocidad 10 cm/s, sin rotación
                 if (navigation.getPose().getX() * 100 >= 120) {
                     stop();
@@ -419,12 +419,12 @@ public class ControlRST implements IControl {
                 break;
 
             case 1: // Rotación a 15°/s
-            	KpLeft = 1; KiLeft = 0.01; KdLeft = 0;
-        		KpRight = 1; KiRight = 0.08; KdRight = 0.12;
+            	KpLeft = 1; KiLeft = 2; KdLeft = 0.05;
+        		KpRight = 1; KiRight = 1.5; KdRight = 0.1;
                 drive(0, 15); // Rotación a 15°/s
                 if (navigation.getPose().getHeading() * (180 / Math.PI) >= 90){
                     stop();
-                    //status = 2;
+                    status = 2;
                     break;
                 }
                 break;
@@ -435,7 +435,7 @@ public class ControlRST implements IControl {
                 drive(5, 0); // Velocidad 5 cm/s
                 if (navigation.getPose().getY() * 100 >= 70) {
                     stop();
-                    status = 3;
+                    //status = 3;
                     break;
                 }
                 break;
@@ -605,53 +605,68 @@ public class ControlRST implements IControl {
 	// ParÃ¡metros PID separados para cada rueda
 
 	private void drive(double v, double omega) {
-	    // ParÃ¡metros del robot
-	    double wheelRadius = 0.028;    
+	    // Parámetros del robot
+	    double wheelRadius = 0.028;
 	    double distanceLength = 0.138;
 	    double maxIntegral = 20;
 	    double PWM_SCALE = 1.2;
+
+	    // Factores de calibración para compensar diferencias entre las ruedas
+	    double calibrationFactorLeft = 1.0;  // Ajustar según pruebas
+	    double calibrationFactorRight = 1.05; // Ajustar según pruebas
 
 	    // Variables de control (Integrales y errores anteriores para cada rueda)
 	    double integralLeft = 0, previousErrorLeft = 0;
 	    double integralRight = 0, previousErrorRight = 0;
 
-	    // CÃ¡lculo de las velocidades deseadas de las ruedas
+	    // Cálculo de las velocidades deseadas de las ruedas
 	    double vLeftDesired = v - (omega * distanceLength / 2.0);
 	    double vRightDesired = v + (omega * distanceLength / 2.0);
 
-	    // Obtener las velocidades actuales de las ruedas
-	    double vLeftActual = getWheelSpeed("left");
-	    double vRightActual = getWheelSpeed("right");
+	    // Obtener las velocidades actuales de las ruedas con suavizado
+	    double alpha = 0.7;  // Factor de suavizado para reducir ruido
+	    double vLeftActual = alpha * getWheelSpeed("left") + (1 - alpha) * getWheelSpeed("left");
+	    double vRightActual = alpha * getWheelSpeed("right") + (1 - alpha) * getWheelSpeed("right");
 
 	    // PID para el motor izquierdo
 	    double errorLeft = vLeftDesired - vLeftActual;
+	    if (Math.abs(errorLeft) < 0.01) errorLeft = 0; // Ignorar errores pequeños
+
 	    integralLeft += errorLeft;
-	    integralLeft = Math.max(-maxIntegral, Math.min(maxIntegral, integralLeft));
+	    integralLeft = Math.max(-maxIntegral, Math.min(maxIntegral, integralLeft)); // Antiwindup
+
+	    if (Math.signum(errorLeft) != Math.signum(previousErrorLeft)) integralLeft = 0; // Reset si cambia de signo
+
 	    double derivativeLeft = errorLeft - previousErrorLeft;
 	    double controlLeft = KpLeft * errorLeft + KiLeft * integralLeft + KdLeft * derivativeLeft;
 	    previousErrorLeft = errorLeft;
 
 	    // PID para el motor derecho
 	    double errorRight = vRightDesired - vRightActual;
+	    if (Math.abs(errorRight) < 0.01) errorRight = 0; // Ignorar errores pequeños
+
 	    integralRight += errorRight;
-	    integralRight = Math.max(-maxIntegral, Math.min(maxIntegral, integralRight));
+	    integralRight = Math.max(-maxIntegral, Math.min(maxIntegral, integralRight)); // Antiwindup
+
+	    if (Math.signum(errorRight) != Math.signum(previousErrorRight)) integralRight = 0; // Reset si cambia de signo
+
 	    double derivativeRight = errorRight - previousErrorRight;
 	    double controlRight = KpRight * errorRight + KiRight * integralRight + KdRight * derivativeRight;
 	    previousErrorRight = errorRight;
 
-	    // CÃ¡lculo de los valores PWM
-	    int powerLeft = (int) (controlLeft / wheelRadius * PWM_SCALE);
-	    int powerRight = (int) (controlRight / wheelRadius * PWM_SCALE);
+	    // Cálculo de los valores PWM con factores de calibración
+	    int powerLeft = (int) (controlLeft / wheelRadius * PWM_SCALE * calibrationFactorLeft);
+	    int powerRight = (int) (controlRight / wheelRadius * PWM_SCALE * calibrationFactorRight);
 
 	    // Limitar los valores PWM al rango permitido [-100, 100]
-	    powerLeft = Math.max(-100, (int) (controlLeft / wheelRadius * PWM_SCALE));
-	    powerRight = Math.max(-100, (int) (controlRight / wheelRadius * PWM_SCALE));
+	    powerLeft = Math.max(-100, Math.min(100, powerLeft));
+	    powerRight = Math.max(-100, Math.min(100, powerRight));
 
 	    // Aplicar potencia a los motores
 	    leftMotor.setPower(powerLeft);
 	    rightMotor.setPower(powerRight);
 
-	    // Monitor para depuraciÃ³n
+	    // Monitor para depuración
 	    monitor.writeControlVar("vLeftDesired", "" + vLeftDesired);
 	    monitor.writeControlVar("vRightDesired", "" + vRightDesired);
 	    monitor.writeControlVar("vLeftActual", "" + vLeftActual);
@@ -660,20 +675,21 @@ public class ControlRST implements IControl {
 	    monitor.writeControlVar("ErrorRight", "" + errorRight);
 	    monitor.writeControlVar("PowerLeft", "" + powerLeft);
 	    monitor.writeControlVar("PowerRight", "" + powerRight);
+	    monitor.writeControlVar("LateralDeviation", "" + (vLeftActual - vRightActual));
 	}
 
-	// MÃ©todo para medir las velocidades simuladas de las ruedas
+	// Método para medir las velocidades simuladas de las ruedas
 	private double getWheelSpeed(String wheel) {
 	    IPerception.AngleDifferenceMeasurement angleMeasurement;
 	    double wheelRadius = 0.028;
 
-	    // SelecciÃ³n del encoder y cÃ¡lculo del radio
+	    // Selección del encoder y cálculo del radio
 	    if (wheel.equalsIgnoreCase("left")) {
 	        angleMeasurement = navigation.getAngleMeasuremntLeft();
 	    } else if (wheel.equalsIgnoreCase("right")) {
 	        angleMeasurement = navigation.getAngleMeasuremntRight();
 	    } else {
-	        throw new IllegalArgumentException("Rueda no vÃ¡lida: " + wheel);
+	        throw new IllegalArgumentException("Rueda no válida: " + wheel);
 	    }
 
 	    // Calcular la velocidad angular en grados por segundo
