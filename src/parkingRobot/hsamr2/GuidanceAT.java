@@ -59,7 +59,7 @@ public class GuidanceAT {
         monitor.startLogging();
 
         while (true) {
-            showData(navigation);
+            showData(navigation,perception);
 
             switch (currentStatus) {
                 case SCOUT:
@@ -91,10 +91,11 @@ public class GuidanceAT {
         if (lastStatus != CurrentStatus.SCOUT) {
             control.setCtrlMode(ControlMode.LINE_CTRL);
             navigation.setDetectionState(true);
-            navigation.setUseOnlyOdometry(true);
+            navigation.setUseOnlyOdometry(false);
         }
 
-        navigation.updateNavigation();
+        // Exception
+        //navigation.updateNavigation();
 
         lastStatus = currentStatus;
 
@@ -138,7 +139,7 @@ public class GuidanceAT {
 
     private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
     	//disable odometry to avoid conflicts
-    	 navigation.setUseOnlyOdometry(false);
+    	 navigation.setUseOnlyOdometry(true);
         // Get all available parking slots
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
 
@@ -228,10 +229,11 @@ public class GuidanceAT {
         currentStatus = status;
     }
 
-    protected static void showData(INavigation navigation) {
+    protected static void showData(INavigation navigation, IPerception perception) {
         LCD.clear();
         LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
         LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
         LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
+        perception.showSensorData();
     }
 }
