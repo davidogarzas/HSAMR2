@@ -20,7 +20,9 @@ public class GuidanceAT {
         SCOUT,
         PAUSE,
         PARK,
-        EXIT
+        EXIT,
+        DEMO1,
+        DEMO2
     }
 
     protected static CurrentStatus currentStatus = CurrentStatus.PAUSE;
@@ -59,7 +61,7 @@ public class GuidanceAT {
         monitor.startLogging();
 
         while (true) {
-            showData(navigation,perception);
+            showData(navigation);
 
             switch (currentStatus) {
                 case SCOUT:
@@ -78,6 +80,16 @@ public class GuidanceAT {
                     monitor.stopLogging();
                     System.exit(0);
                     break;
+                    
+                 // --ADDED FOR DEMO--
+                case DEMO1:
+                    handleDemo1Mode(control);
+                    break;
+
+                // --ADDED FOR DEMO--
+                case DEMO2:
+                    handleDemo2Mode(control);
+                    break;
 
                 default:
                     break;
@@ -86,16 +98,62 @@ public class GuidanceAT {
             Thread.sleep(100);
         }
     }
+    
+    // --ADDED FOR DEMO--
+    private static void handleDemo1Mode(IControl control) throws InterruptedException {
+        // Enter action
+        if (lastStatus != CurrentStatus.DEMO1) {
+            control.setCtrlMode(ControlMode.DEMO_PRG1); // or however you name it
+        }
+
+        lastStatus = currentStatus;
+
+        // Check transitions
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.PAUSE;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1);
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1);
+            }
+        }
+    }
+    
+    // --ADDED FOR DEMO--
+    private static void handleDemo2Mode(IControl control) throws InterruptedException {
+        // Enter action
+        if (lastStatus != CurrentStatus.DEMO2) {
+            control.setCtrlMode(ControlMode.DEMO_PRG2);
+        }
+
+        lastStatus = currentStatus;
+
+        // Check transitions
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.PAUSE;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1);
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1);
+            }
+        }
+    }
+    
 
     private static void handleScoutMode(INavigation navigation, IControl control) throws InterruptedException {
         if (lastStatus != CurrentStatus.SCOUT) {
             control.setCtrlMode(ControlMode.LINE_CTRL);
             navigation.setDetectionState(true);
-            navigation.setUseOnlyOdometry(false);
+            navigation.setUseOnlyOdometry(true);
         }
 
-        // Exception
-        //navigation.updateNavigation();
+        navigation.updateNavigation();
 
         lastStatus = currentStatus;
 
@@ -110,10 +168,14 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK;
+            currentStatus = CurrentStatus.DEMO1; //se cambia a .park o a .demo1 dependiendo de la prueba
             while (Button.RIGHT.isDown()) {
                 Thread.sleep(1);
             }
+        }
+        else if (Button.LEFT.isDown()) {
+            currentStatus = CurrentStatus.DEMO2; //lo mismo pero para demo2
+            while (Button.LEFT.isDown()) { Thread.sleep(1); }
         }
     }
 
@@ -135,11 +197,22 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         }
+        //checks for demo1
+        else if (Button.RIGHT.isDown()) {
+        currentStatus = CurrentStatus.DEMO1;
+        while (Button.RIGHT.isDown()) Thread.sleep(1);
+
+    // --- NEW: Jump to DEMO2 with left button ---
+    } else if (Button.LEFT.isDown()) {
+        currentStatus = CurrentStatus.DEMO2;
+        while (Button.LEFT.isDown()) Thread.sleep(1);
+    }
+        
     }
 
     private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
     	//disable odometry to avoid conflicts
-    	 navigation.setUseOnlyOdometry(true);
+    	 navigation.setUseOnlyOdometry(false);
         // Get all available parking slots
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
 
@@ -229,11 +302,10 @@ public class GuidanceAT {
         currentStatus = status;
     }
 
-    protected static void showData(INavigation navigation, IPerception perception) {
+    protected static void showData(INavigation navigation) {
         LCD.clear();
         LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
         LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
         LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
-        perception.showSensorData();
     }
 }
