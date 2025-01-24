@@ -12,6 +12,7 @@ import parkingRobot.INxtHmi;
 import parkingRobot.IControl;
 import parkingRobot.IControl.ControlMode;
 import parkingRobot.INavigation;
+import parkingRobot.INavigation.ParkingSlot.ParkingSlotStatus;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
@@ -40,6 +41,9 @@ public class GuidanceAT {
     static Line line7 = new Line(0, 60, 0, 0);
 
     static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
+    
+    //local Mode variable to set hmi mode
+    private static INxtHmi.Mode currentMode = INxtHmi.Mode.PAUSE;
 
     public static void main(String[] args) throws Exception {
         while (Button.ENTER.isDown()) {}
@@ -65,6 +69,9 @@ public class GuidanceAT {
 
         while (true) {
             showData(navigation, perception);
+            
+         // Update the HMI mode based on the current state
+            updateHmiMode(monitor);
 
             switch (currentStatus) {
                 case SCOUT:
@@ -152,6 +159,32 @@ public class GuidanceAT {
         }
     }*/
     
+ // Update HMI mode
+    private static void updateHmiMode(IMonitor monitor) {
+        // Determine the mode based on the current status
+        switch (currentStatus) {
+            case SCOUT:
+                currentMode = INxtHmi.Mode.SCOUT;
+                break;
+            case PARK:
+                currentMode = INxtHmi.Mode.PARK_NOW;
+                break;
+            case AUSPARKEN:
+            case PAUSE:
+                currentMode = INxtHmi.Mode.PAUSE;
+                break;
+            case EXIT:
+                currentMode = INxtHmi.Mode.DISCONNECT;
+                break;
+            default:
+                currentMode = INxtHmi.Mode.PAUSE;
+                break;
+        }
+
+        // Log the updated mode for monitoring
+        monitor.writeGuidanceComment("Updated HMI Mode: " + currentMode.name());
+    }
+    
 
     private static void handleScoutMode(INavigation navigation, IControl control) throws InterruptedException {
         if (lastStatus != CurrentStatus.SCOUT) {
@@ -226,27 +259,29 @@ public class GuidanceAT {
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
 
         if (slots != null && slots.length > 0) {
-            // Select the first parking slot as the target
-            INavigation.ParkingSlot targetSlot = slots[3];
-
-            // Calculate the middle point of the parking slot
-            double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
-            double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
-
-            // Display "Parking" while driving
-            LCD.clear();
-            LCD.drawString("Parking...", 0, 3);
-
-            // Set the destination to the middle point
-            control.setDestination(0, middleX, middleY);
-
-            // Drive until the robot reaches the middle point
-            while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
-                    || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
-                navigation.updateNavigation();
-                Thread.sleep(100); // Allow time for updates and smooth driving
+            // Select the first suitable parking slot
+            INavigation.ParkingSlot targetSlot = null;
+            for (INavigation.ParkingSlot slot : slots) {
+                if (slot.getStatus() == ParkingSlotStatus.SUITABLE_FOR_PARKING) {
+                    targetSlot = slot;
+                    break;
+                }
             }
 
+            if (targetSlot != null) {
+                double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
+                double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
+
+                LCD.clear();
+                LCD.drawString("Parking...", 0, 3);
+
+                control.setDestination(0, middleX, middleY);
+
+                while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
+                        || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
+                    navigation.updateNavigation();
+                    Thread.sleep(100);
+                }
             // Stop the robot at the middle point
             control.setCtrlMode(IControl.ControlMode.INACTIVE);
 
@@ -275,6 +310,7 @@ public class GuidanceAT {
                 Thread.sleep(1); // Wait for button release
             }
         }
+    }
     }
 
     private static void handleAusparkenMode(INavigation navigation, IControl control) throws InterruptedException {
