@@ -117,8 +117,53 @@ public class GuidanceAT {
     }
     
     private static void updateStateFromHmiOrButtons(INxtHmi hmi) {
-        if (hmi.getMode() != null) {
-            // HMI is connected, use its mode
+        boolean buttonHandled = false; // Track if a button was pressed
+
+        // Check button inputs first
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.SCOUT;
+            buttonHandled = true;
+            while (Button.ENTER.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            buttonHandled = true;
+            while (Button.ESCAPE.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.RIGHT.isDown()) {
+            currentStatus = CurrentStatus.PARK;
+            buttonHandled = true;
+            while (Button.RIGHT.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.LEFT.isDown()) {
+            currentStatus = CurrentStatus.AUSPARKEN;
+            buttonHandled = true;
+            while (Button.LEFT.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        // If no button was pressed, use HMI mode if connected
+        if (!buttonHandled && hmi.getMode() != null) {
             switch (hmi.getMode()) {
                 case SCOUT:
                     currentStatus = CurrentStatus.SCOUT;
@@ -135,48 +180,9 @@ public class GuidanceAT {
                 default:
                     break;
             }
-        } else {
-            // HMI is not connected, use button logic
-            if (Button.ENTER.isDown()) {
-                currentStatus = CurrentStatus.SCOUT;
-                while (Button.ENTER.isDown()) {
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } else if (Button.ESCAPE.isDown()) {
-                currentStatus = CurrentStatus.EXIT;
-                while (Button.ESCAPE.isDown()) {
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } else if (Button.RIGHT.isDown()) {
-                currentStatus = CurrentStatus.PARK;
-                while (Button.RIGHT.isDown()) {
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
         }
     }
-    
- // Pause Transition Check (used so that you can pause on Park_This and ausparken
-    private static void checkForPause() throws InterruptedException {
-        if (Button.ENTER.isDown()) {
-            currentStatus = CurrentStatus.PAUSE;
-            while (Button.ENTER.isDown()) {
-                Thread.sleep(1);
-            }
-        }
-    }
+
     
     // --ADDED FOR DEMO--
     /*private static void handleDemo1Mode(IControl control) throws InterruptedException {
@@ -346,7 +352,13 @@ public class GuidanceAT {
                 while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
                         || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
                     navigation.setUseOnlyOdometry(true);
-                    checkForPause();
+                    if (Button.ENTER.isDown()) {
+                        currentStatus = CurrentStatus.PAUSE;
+                        while (Button.ENTER.isDown()) {
+                            Thread.sleep(1); // Wait for button release
+                        }
+                        return; // Exit the method to transition to PAUSE
+                    }
                     Thread.sleep(100);
                 }
             // Stop the robot at the middle point
@@ -378,7 +390,6 @@ public class GuidanceAT {
             }
         }
     }
-        checkForPause();
     }
 
     private static void handleAusparkenMode(INavigation navigation, IControl control) throws InterruptedException {
@@ -400,8 +411,6 @@ public class GuidanceAT {
 
         // Automatically start SCOUT mode
         control.setCtrlMode(IControl.ControlMode.LINE_CTRL);
-        
-        checkForPause();
     }
 
     public static CurrentStatus getCurrentStatus() {
