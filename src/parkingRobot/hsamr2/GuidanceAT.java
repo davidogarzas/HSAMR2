@@ -21,7 +21,7 @@ public class GuidanceAT {
     public enum CurrentStatus {
         SCOUT,
         PAUSE,
-        PARK,
+        PARK_THIS,
         AUSPARKEN,
         EXIT,
         //DEMO1,
@@ -85,7 +85,7 @@ public class GuidanceAT {
                     handlePauseMode(control);
                     break;
 
-                case PARK:
+                case PARK_THIS:
                     handleParkMode(navigation, control, hmi); // Pass perception here
                     break;
 
@@ -141,7 +141,7 @@ public class GuidanceAT {
                 }
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK;
+            currentStatus = CurrentStatus.PARK_THIS;
             buttonHandled = true;
             while (Button.RIGHT.isDown()) {
                 try {
@@ -169,7 +169,7 @@ public class GuidanceAT {
                     currentStatus = CurrentStatus.SCOUT;
                     break;
                 case PARK_NOW:
-                    currentStatus = CurrentStatus.PARK;
+                    currentStatus = CurrentStatus.PARK_THIS;
                     break;
                 case PAUSE:
                     currentStatus = CurrentStatus.PAUSE;
@@ -237,7 +237,7 @@ public class GuidanceAT {
             case SCOUT:
                 currentMode = INxtHmi.Mode.SCOUT;
                 break;
-            case PARK:
+            case PARK_THIS:
                 currentMode = INxtHmi.Mode.PARK_NOW;
                 break;
             case AUSPARKEN:
@@ -277,7 +277,7 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK; //Change this to DEMO1 or PARK for testing
+            currentStatus = CurrentStatus.PARK_THIS; //Change this to DEMO1 or PARK for testing
             while (Button.RIGHT.isDown()) {
                 Thread.sleep(1);
             }
@@ -309,7 +309,7 @@ public class GuidanceAT {
         }
         //checks for demo1
         else if (Button.RIGHT.isDown()) {
-        currentStatus = CurrentStatus.PARK; //Change to DEMO1 or PARK for testing
+        currentStatus = CurrentStatus.PARK_THIS; //Change to DEMO1 or PARK for testing
         while (Button.RIGHT.isDown()) Thread.sleep(1);
 
     // --- NEW: Jump to DEMO2 with left button ---
