@@ -43,6 +43,8 @@ public interface IControl {
 		INACTIVE,
 		
 		DEMO_PRG1,
+		
+		DEMO_PRG2,
 	}
 	
 		

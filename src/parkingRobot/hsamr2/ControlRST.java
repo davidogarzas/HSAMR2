@@ -7,6 +7,7 @@ import parkingRobot.IControl;
 import parkingRobot.IMonitor;
 import parkingRobot.IPerception;                 
 import parkingRobot.IPerception.*;
+
 import lejos.nxt.LCD;
 import lejos.nxt.NXTMotor;
 import parkingRobot.INavigation;
@@ -199,6 +200,9 @@ public class ControlRST implements IControl {
 		  case DEMO_PRG1 	: update_DEMOPRG1_Parameter();
 		                      exec_DEMOPRG1_ALGO();
 		                      break;
+		  case DEMO_PRG2 	: update_DEMOPRG2_Parameter();
+          					  exec_DEMOPRG2_ALGO();
+          					  break;
 		}
 
 	}
@@ -207,6 +211,10 @@ public class ControlRST implements IControl {
 
 
 	private void update_DEMOPRG1_Parameter() {
+
+	}
+	
+	private void update_DEMOPRG2_Parameter() {
 
 	}
 
@@ -228,34 +236,29 @@ public class ControlRST implements IControl {
 	/**
 	 * update parameters during PARKING Control Mode
 	 */
-	private void update_PARKCTRL_Parameter(){
-		//Aufgabe 3.4
-		// Aktuelle Pose des Roboters abrufen
+	private void update_PARKCTRL_Parameter() {
+	    // Obtener la posición actual del robot
 	    Pose currentPose = navigation.getPose();
 
-	    // Zielpose (z. B. Mitte der Parklücke) definieren
-	    Pose targetPose = new Pose(80, 30, 0); // Beispielwerte: X, Y, Orientierung
+	    // Definir la posición objetivo (ejemplo: el centro de la plaza de estacionamiento)
+	    Pose targetPose = new Pose(80, 30, 0); // Valores de ejemplo
 
-	    // Berechnung der Abweichungen zur Zielpose
+	    // Calcular las diferencias
 	    double dx = targetPose.getX() - currentPose.getX();
 	    double dy = targetPose.getY() - currentPose.getY();
-	    double distanceToTarget = Math.sqrt(dx * dx + dy * dy); // Abstand zum Ziel
-	    double angleToTarget = Math.atan2(dy, dx); // Winkel zum Ziel relativ zur aktuellen Position
+	    double distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+	    double angleToTarget = Math.atan2(dy, dx);
 
-	    // Unterschied zwischen aktueller und Zielorientierung
+	    // Calcular el error de orientación
 	    double orientationError = angleToTarget - currentPose.getHeading();
 
-	    // Querabweichung zur geplanten Bahn
-	    double lateralError = computeLateralError(currentPose, targetPose.getX(), targetPose.getY());
-
-	    // Aktualisieren der Regelparameter für Ein- und Ausparken
+	    // Actualizar variables en el monitor para diagnóstico
 	    monitor.writeControlVar("CurrentX", String.valueOf(currentPose.getX()));
 	    monitor.writeControlVar("CurrentY", String.valueOf(currentPose.getY()));
 	    monitor.writeControlVar("TargetX", String.valueOf(targetPose.getX()));
 	    monitor.writeControlVar("TargetY", String.valueOf(targetPose.getY()));
 	    monitor.writeControlVar("DistanceToTarget", String.valueOf(distanceToTarget));
 	    monitor.writeControlVar("OrientationError", String.valueOf(orientationError));
-	    monitor.writeControlVar("LateralError", String.valueOf(lateralError));
 	}
 	/**
 	 * update parameters during LINE Control Mode
@@ -273,12 +276,12 @@ public class ControlRST implements IControl {
 		this.drive(this.velocity, this.angularVelocity);
 	}
     
-	//Aufgabe 3.3
+ // Aufgabe 3.3: Regelung der Geradeausfahrt
     private void exec_SETPOSE_ALGO() {
-    	// Zielposition definieren
+        // Zielposition definieren
         double targetX = 200.0; // Ziel in X-Richtung
         double targetY = 0.0;   // Ziel in Y-Richtung
-        //double targetTheta = 0.0; // Zielorientierung
+        double targetTheta = 0.0; // Zielorientierung (Richtung der Gerade)
 
         // PID-Regelparameter
         double kp = 2.0;    // Proportionalverstärker
@@ -295,10 +298,12 @@ public class ControlRST implements IControl {
             Pose currentPose = navigation.getPose();
             double currentX = currentPose.getX();
             double currentY = currentPose.getY();
-            //double currentTheta = currentPose.getHeading();
+            double currentTheta = currentPose.getHeading();
 
-            // Abbruchbedingung: Ziel erreicht
-            if (Math.abs(currentX - targetX) < 1.0 && Math.abs(currentY - targetY) < 1.0) {
+            // Abbruchbedingung: Ziel erreicht (inkl. Orientierung)
+            if (Math.abs(currentX - targetX) < 1.0 && 
+                Math.abs(currentY - targetY) < 1.0 &&
+                Math.abs(currentTheta - targetTheta) < 0.1) {
                 break;
             }
 
@@ -310,9 +315,9 @@ public class ControlRST implements IControl {
             double derivative = error - lastError;
             double correction = kp * error + ki * integral + kd * derivative;
 
-            // Steuergrößen berechnen
-            double v = 10.0; // Konstante Geschwindigkeit
-            double omega = correction;
+            // Dynamische Geschwindigkeit basierend auf Querabweichung
+            double v = Math.max(5.0, 20.0 - Math.abs(error)); // Zwischen 5 und 20 cm/s
+            double omega = correction; // Korrektur der Drehgeschwindigkeit
 
             // In Radgeschwindigkeiten umrechnen und anwenden
             drive(v, omega);
@@ -330,61 +335,56 @@ public class ControlRST implements IControl {
 
     /**
      * Berechnet die Querabweichung zur Zielgeraden.
+     * Diese Methode berücksichtigt die Orientierung des Roboters.
      */
     private double computeLateralError(Pose pose, double targetX, double targetY) {
         double x = pose.getX();
         double y = pose.getY();
         double theta = pose.getHeading();
 
+        // Abstand des Roboters von der Linie (projektion auf die Normale)
         double dx = targetX - x;
         double dy = targetY - y;
 
         return -dy * Math.cos(theta) + dx * Math.sin(theta);
     }
-	
 	/**
 	 * PARKING along the generated path
 	 */
-	private void exec_PARKCTRL_ALGO(){
-		//Aufgabe 3.4
-		// Zielpositionen definieren (Start- und Endpunkt)
-	    Pose startPose = navigation.getPose();
-	    Pose targetPose = new Pose(100, 50, 0); // Beispielwerte: Zielposition
-	    
-	    // Bahnplanung: Hier eine einfache Kurve (kann durch ein Polynom ersetzt werden)
-	    double t = 0.0; // Parameter für die Bahn (0 ≤ t ≤ 1)
-	    double dt = 0.05; // Schrittweite
-	    
-	    while (t <= 1.0) {
-	        // Berechne die aktuelle Zielposition entlang der Bahn
-	        double x = startPose.getX() + t * (targetPose.getX() - startPose.getX());
-	        double y = startPose.getY() + t * (targetPose.getY() - startPose.getY());
-	        
-	        // Berechne die Stellgrößen v und ω
-	        double dx = x - navigation.getPose().getX();
-	        double dy = y - navigation.getPose().getY();
-	        double distance = Math.sqrt(dx * dx + dy * dy);
-	        double angle = Math.atan2(dy, dx);
-	        
-	        double v = Math.min(10, distance); // Geschwindigkeit begrenzen
-	        double omega = angle - navigation.getPose().getHeading(); // Drehwinkel
-	        
-	        // Umsetzen der Stellgrößen in Radgeschwindigkeiten
-	        drive(v, omega);
-	        
-	        // Überprüfen, ob das Ziel erreicht wurde
-	        if (distance < 2.0) { // Toleranzradius
-	            break;
-	        }
-	        
-	        // Zeitinkrement
-	        t += dt;
-	        Delay.msDelay(50);
-	    }
-	    
-	    // Motoren stoppen
-	    stop();
-	}
+    private void exec_PARKCTRL_ALGO() {
+        // Coeficientes del polinomio de tercer grado (ajustar según necesidades)
+        double a = 1;
+        double b = -0.5;
+        double c = 0.2;
+        double d = 0;
+
+        // Tiempo inicial y duración total
+        long startTime = System.currentTimeMillis();
+        long totalTime = 5000; // 5 segundos
+
+        while (System.currentTimeMillis() - startTime <= totalTime) {
+            // Calcular el tiempo normalizado (t entre 0 y 1)
+            double t = (double) (System.currentTimeMillis() - startTime) / totalTime;
+
+            // Calcular la posición y derivadas
+            double y = a * Math.pow(t, 3) + b * Math.pow(t, 2) + c * t + d;
+            double dy = 3 * a * Math.pow(t, 2) + 2 * b * t + c;
+            double ddy = 6 * a * t + 2 * b;
+
+            // Velocidades deseadas
+            double v = dy; // Velocidad lineal
+            double omega = ddy; // Velocidad angular
+
+            // Enviar comandos al controlador
+            drive(v, omega);
+
+            // Pausa breve
+            Delay.msDelay(50);
+        }
+
+        // Detener los motores al finalizar
+        drive(0, 0);
+    }
 	
     private void exec_INACTIVE(){
     	this.stop();
@@ -397,20 +397,18 @@ public class ControlRST implements IControl {
 	 * white = 0, black = 2, grey = 1
 	 */
     
-    int status = 0;
+    int status = 6;
     
     private void exec_DEMOPRG1_ALGO() {
         leftMotor.forward();
         rightMotor.forward();
         navigation.setUseOnlyOdometry(true);
         
-        //double TOLERANCE = 2.0; // Tolerancia para comparación en cm o grados
-
         switch (status) {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
-            	KpLeft = 0.005; KiLeft = 1.3; KdLeft = 0.8;
-            	KpRight = 0.006; KiRight = 1.2; KdRight = 0.6;
-                drive(10, 0); // Velocidad 10 cm/s, sin rotación
+            	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.2;
+            	KpRight = 0.6; KiRight = 0.75; KdRight = 0.3;
+                drive(1, 0); // Velocidad 10 cm/s, sin rotación
                 if (navigation.getPose().getX() * 100 >= 120) {
                     stop();
                     status = 1;
@@ -419,10 +417,10 @@ public class ControlRST implements IControl {
                 break;
 
             case 1: // Rotación a 15°/s
-            	KpLeft = 1; KiLeft = 2; KdLeft = 0.05;
-        		KpRight = 1; KiRight = 1.5; KdRight = 0.1;
+            	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+        		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
                 drive(0, 15); // Rotación a 15°/s
-                if (navigation.getPose().getHeading() * (180 / Math.PI) >= 90){
+                if (navigation.getPose().getHeading() * (180 / Math.PI) >= 70){
                     stop();
                     status = 2;
                     break;
@@ -430,21 +428,21 @@ public class ControlRST implements IControl {
                 break;
 
             case 2: // Avanzar en línea recta 30 cm a 5 cm/s
-            	KpLeft = 0.1; KiLeft = 0.3; KdLeft = 10;
-            	KpRight = 0.1; KiRight = 0.5; KdRight = 15;
-                drive(5, 0); // Velocidad 5 cm/s
-                if (navigation.getPose().getY() * 100 >= 70) {
+            	KpLeft = 1.4; KiLeft = 1.4; KdLeft = 0.4;
+            	KpRight = 1.2; KiRight = 1.5; KdRight = 0.4;
+                drive(0.5, 0); // Velocidad 5 cm/s
+                if (navigation.getPose().getY() * 100 >= 25) {
                     stop();
-                    //status = 3;
+                    status = 3;
                     break;
                 }
                 break;
 
             case 3: // Rotación a -30°/s
-            	KpLeft = 1; KiLeft = 0.01; KdLeft = 0;
-        		KpRight = 1; KiRight = 0.08; KdRight = 0.12;
+            	KpLeft = 0.4; KiLeft = 0.95; KdLeft = 0.025;
+        		KpRight = 0.4; KiRight = 0.75; KdRight = 0.025;
                 drive(0, -30); // Rotación a -30°/s
-                if (navigation.getPose().getHeading() * 180 / Math.PI == -90) {
+                if (navigation.getPose().getHeading() * 180 / Math.PI <= 0) {
                     stop();
                     status = 4; // Cambia al seguimiento de línea
                     break;
@@ -452,6 +450,7 @@ public class ControlRST implements IControl {
                 break;
 
             case 4: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
                 exec_LINECTRL_ALGO();
                 break;
 
@@ -460,82 +459,168 @@ public class ControlRST implements IControl {
                 break;
         }
     }
-
     
-    /*private void move(){
-    	leftMotor.setPower(40);
-        rightMotor.setPower(40);
-    }*/
+    private void exec_DEMOPRG2_ALGO() {
+        leftMotor.forward();
+        rightMotor.forward();
+        navigation.setUseOnlyOdometry(true);
+        
+        switch (status) {
+            case 0: // Geradeausfahrt 120 cm mit 10 cm/s
+            	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+            	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+                drive(1, 0); // Velocidad 10 cm/s, sin rotación
+                if (navigation.getPose().getX() * 100 >= 120) {
+                    stop();
+                    status = 1;
+                    break;
+                }
+                break;
 
+            case 1: // Rotación a 15°/s
+            	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+        		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+                drive(0, 15); // Rotación a 15°/s
+                if (navigation.getPose().getHeading() * (180 / Math.PI) >= 70){
+                    stop();
+                    status = 2;
+                    break;
+                }
+                break;
+
+            case 2: // Avanzar en línea recta 30 cm a 5 cm/s
+            	KpLeft = 1.4; KiLeft = 1; KdLeft = 0.6;
+            	KpRight = 1.2; KiRight = 1.5; KdRight = 0.8;
+                drive(0.5, 0); // Velocidad 5 cm/s
+                if (navigation.getPose().getY() * 100 >= 30) {
+                    stop();
+                    status = 3;
+                    break;
+                }
+                break;
+
+            case 3: // Rotación a -30°/s
+            	KpLeft = 0.4; KiLeft = 0.95; KdLeft = 0.025;
+        		KpRight = 0.4; KiRight = 0.75; KdRight = 0.025;
+                drive(0, -30); // Rotación a -30°/s
+                if (navigation.getPose().getHeading() * 180 / Math.PI <= 0) {
+                    stop();
+                    navigation.setPose(0, 0, 0);
+                    status = 4; // Cambia al seguimiento de línea
+                    break;
+                }
+                break;
+
+            case 4: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
+                exec_LINECTRL_ALGO();
+                if (navigation.getPose().getX() * 100 <= -117) {
+                    stop();
+                    status = 5;
+                    break;
+                }
+                
+                break;
+                
+            case 5: // Rotación
+            	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+        		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+                drive(0, 15); // Rotación a 15°/s
+                if (navigation.getPose().getHeading() * (180 / Math.PI) >= -30){
+                    stop();
+                    navigation.setPose(0, 0, 0);
+                    status = 6;
+                    break;
+                }
+                break;
+                
+            case 6: // Geradeausfahrt 120 cm mit 10 cm/s
+            	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
+            	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
+                drive(1, 0); // Velocidad 10 cm/s, sin rotación
+                if (navigation.getPose().getX() * 100 >= 10) {
+                    stop();
+                    status = 7;
+                    break;
+                }
+                break;
+                
+            case 7:
+            	update_PARKCTRL_Parameter();
+            	exec_PARKCTRL_ALGO();
+            	break;
+
+            default:
+                LCD.drawString("Unexpected status: " + status, 0, 7);
+                break;
+        }
+    }
     
     private void exec_LINECTRL_ALGO() {
+    	// Beide Motoren starten vorwärts
         leftMotor.forward();
         rightMotor.forward();
 
-        // Valores de los sensores: 0 = blanco, 1 = gris, 2 = negro
+        // Sensorwerte: 0 = weiß, 1 = grau, 2 = schwarz
         int sensorLeftValue = this.lineSensorLeft;
         int sensorRightValue = this.lineSensorRight;
 
-        // Parámetros de potencia para esquinas
-        int basePowerCorner = 30;    // Velocidad base para esquinas
-        int maxCorrectionCorner = 50; // Corrección máxima para esquinas
-        float pCorner = 25;          // Coeficiente proporcional para esquinas
-        float iCorner = 0.2f;        // Coeficiente integral para esquinas
-        double dCorner = 0.8;        // Coeficiente derivativo para esquinas
+        // Leistungsparameter für Kurven
+        int basePowerCorner = 30;    // Basisgeschwindigkeit für Kurven
+        int maxCorrectionCorner = 50; // Maximale Korrektur für Kurven
+        float pCorner = 25;          // Proportionalfaktor für Kurven
+        float iCorner = 0.2f;        // Integralfaktor für Kurven
+        double dCorner = 0.8;        // Differentialfaktor für Kurven
         
-        //float pCorner = 5;          // Coeficiente proporcional para esquinas
-        //float iCorner = 8.0f;        // Coeficiente integral para esquinas
-        //double dCorner = 0;        // Coeficiente derivativo para esquinas
-        
-        // Parámetros de potencia para línea recta
-        int basePowerStraight = 30;   // Velocidad base para línea recta
-        int maxCorrectionStraight = 20; // Corrección máxima para línea recta
-        float pStraight = 20;        // Coeficiente proporcional para línea recta
-        float iStraight = 0.05f;     // Coeficiente integral para línea recta
-        double dStraight = 2;        // Coeficiente derivativo para línea recta
+        // Leistungsparameter für gerade Linien
+        int basePowerStraight = 30;   // Basisgeschwindigkeit für gerade Linien
+        int maxCorrectionStraight = 20; // Maximale Korrektur für gerade Linien
+        float pStraight = 20;        // Proportionalfaktor für gerade Linien
+        float iStraight = 0.05f;     // Integralfaktor für gerade Linien
+        double dStraight = 2;        // Differentialfaktor für gerade Linien
 
-        // Variables para el controlador PID (esquinas)
-        int previousError = 0;      // Error anterior
-        int integral = 0;           // Suma acumulada del error
+        // Variablen für den PID-Regler (Kurven)
+        int previousError = 0;      // Vorheriger Fehler
+        int integral = 0;           // Kumulierte Fehler-Summe
 
-        // Detectar si está en línea recta o esquina
-        boolean isCorner = (sensorLeftValue == 2 || sensorRightValue == 2); // Esquinas detectadas si alguno está en negro
+     // Erkennung: gerade Linie oder Kurve
+        boolean isCorner = (sensorLeftValue == 2 || sensorRightValue == 2); // Kurve erkannt, wenn einer der Sensoren schwarz meldet
 
         if (isCorner) {
-            // Controlador PID para esquinas
+        	// PID-Regler für Kurven
 
-            // Calcular el error
+        	// Fehler berechnen
             int error = sensorLeftValue - sensorRightValue;
 
-            // Calcular la derivada del error
+            // Fehlerableitung berechnen
             int derivative = error - previousError;
 
-            // Calcular el término integral
+            // Integralwert berechnen
             integral += error;
 
-            // Controlador PID
+            // PID-Regler-Berechnung
             double correction = (pCorner * error) + (iCorner * integral) + (dCorner * derivative);
 
-            // Limitar la corrección
+         // Korrektur begrenzen
             if (correction < -maxCorrectionCorner) { correction = -maxCorrectionCorner; }
             else if (correction > maxCorrectionCorner) { correction = maxCorrectionCorner; }
 
-            // Ajustar potencia de los motores
+            // Motorleistung anpassen
             int leftPower = (int) Math.round(basePowerCorner - correction);
             int rightPower = (int) Math.round(basePowerCorner + correction);
 
-            // Limitar la potencia del motor
+            // Motorleistung auf -100 bis 100 begrenzen
             leftPower = Math.max(-100, Math.min(100, leftPower));
             rightPower = Math.max(-100, Math.min(100, rightPower));
 
-            // Asignar la potencia a los motores
+            // Leistung an die Motoren senden
             leftMotor.setPower(leftPower);
             rightMotor.setPower(rightPower);
 
-            // Guardar el error actual
+            // Fehler speichern
             previousError = error;
 
-            // MONITOR
+            // Überwachungsinformationen
             monitor.writeControlVar("Mode", "Corner");
             monitor.writeControlVar("LeftSensor", "" + sensorLeftValue);
             monitor.writeControlVar("RightSensor", "" + sensorRightValue);
@@ -544,40 +629,40 @@ public class ControlRST implements IControl {
             monitor.writeControlVar("Correction", "" + correction);
             monitor.writeControlVar("Error", "" + error);
         } else {
-            // Controlador PID para líneas rectas
+        	// PID-Regler für gerade Linien
 
-            // Calcular el error
+            // Fehler berechnen
             int error = sensorLeftValue - sensorRightValue;
 
-            // Calcular la derivada del error
+            // Fehlerableitung berechnen
             int derivative = error - previousError;
 
-            // Calcular el término integral
+            // Integralwert berechnen
             integral += error;
 
-            // Controlador PID
+            // PID-Regler-Berechnung
             double correction = (pStraight * error) + (iStraight * integral) + (dStraight * derivative);
 
-            // Limitar la corrección
+            // Korrektur begrenzen
             if (correction < -maxCorrectionStraight) { correction = -maxCorrectionStraight; }
             else if (correction > maxCorrectionStraight) { correction = maxCorrectionStraight; }
 
-            // Ajustar potencia de los motores
+            // Motorleistung anpassen
             int leftPower = (int) Math.round(basePowerStraight - correction);
             int rightPower = (int) Math.round(basePowerStraight + correction);
 
-            // Limitar la potencia del motor
+            // Motorleistung auf -100 bis 100 begrenzen
             leftPower = Math.max(-100, Math.min(100, leftPower));
             rightPower = Math.max(-100, Math.min(100, rightPower));
 
-            // Asignar la potencia a los motores
+            // Leistung an die Motoren senden
             leftMotor.setPower(leftPower);
             rightMotor.setPower(rightPower);
 
-            // Guardar el error actual
+            // Fehler speichern
             previousError = error;
 
-            // MONITOR
+            // Überwachungsinformationen
             monitor.writeControlVar("Mode", "Straight");
             monitor.writeControlVar("LeftSensor", "" + sensorLeftValue);
             monitor.writeControlVar("RightSensor", "" + sensorRightValue);

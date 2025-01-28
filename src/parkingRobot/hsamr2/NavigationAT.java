@@ -287,6 +287,12 @@ public class NavigationAT implements INavigation{
 		this.useOnlyOdometry = isOn;
 	}
 	
+	// For control demo
+	public void setPose(float x, float y, float phi){
+		this.pose.setLocation(x, y); // [m]
+		this.pose.setHeading(phi); // [rad]
+	}
+	
 	
 	// 	Class control
 	
