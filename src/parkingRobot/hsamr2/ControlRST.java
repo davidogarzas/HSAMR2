@@ -237,11 +237,11 @@ public class ControlRST implements IControl {
 	 * update parameters during PARKING Control Mode
 	 */
 	private void update_PARKCTRL_Parameter() {
-	    // Obtener la posición actual del robot
+	    // Aktuelle Pose des Roboters abrufen
 	    Pose currentPose = navigation.getPose();
 
-	    // Definir la posición objetivo (ejemplo: el centro de la plaza de estacionamiento)
-	    Pose targetPose = new Pose(80, 30, 0); // Valores de ejemplo
+	    // Zielpose definieren (z. B. Mitte der Parkl�cke)
+	    Pose targetPose = new Pose(80, 30, 0); // Beispielwerte: X, Y, Orientierung
 
 	    // Calcular las diferencias
 	    double dx = targetPose.getX() - currentPose.getX();
@@ -252,7 +252,10 @@ public class ControlRST implements IControl {
 	    // Calcular el error de orientación
 	    double orientationError = angleToTarget - currentPose.getHeading();
 
-	    // Actualizar variables en el monitor para diagnóstico
+	    // Querabweichung zur geplanten Bahn
+	    double lateralError = computeLateralError(currentPose, targetPose.getX(), targetPose.getY());
+
+	    // Aktualisieren der Regelparameter f�r Ein- und Ausparken
 	    monitor.writeControlVar("CurrentX", String.valueOf(currentPose.getX()));
 	    monitor.writeControlVar("CurrentY", String.valueOf(currentPose.getY()));
 	    monitor.writeControlVar("TargetX", String.valueOf(targetPose.getX()));
@@ -284,9 +287,9 @@ public class ControlRST implements IControl {
         double targetTheta = 0.0; // Zielorientierung (Richtung der Gerade)
 
         // PID-Regelparameter
-        double kp = 2.0;    // Proportionalverstärker
-        double ki = 0.1;    // Integralverstärker
-        double kd = 0.5;    // Differenzialverstärker
+        double kp = 2.0;    // Proportionalverst�rker
+        double ki = 0.1;    // Integralverst�rker
+        double kd = 0.5;    // Differenzialverst�rker
 
         // Initialisierung von Variablen
         double lastError = 0.0;
@@ -325,7 +328,7 @@ public class ControlRST implements IControl {
             // Fehler aktualisieren
             lastError = error;
 
-            // Pause für Stabilität
+            // Pause f�r Stabilit�t
             Delay.msDelay(50);
         }
 
@@ -335,7 +338,7 @@ public class ControlRST implements IControl {
 
     /**
      * Berechnet die Querabweichung zur Zielgeraden.
-     * Diese Methode berücksichtigt die Orientierung des Roboters.
+     * Diese Methode ber�cksichtigt die Orientierung des Roboters.
      */
     private double computeLateralError(Pose pose, double targetX, double targetY) {
         double x = pose.getX();
@@ -352,34 +355,40 @@ public class ControlRST implements IControl {
 	 * PARKING along the generated path
 	 */
     private void exec_PARKCTRL_ALGO() {
-        // Coeficientes del polinomio de tercer grado (ajustar según necesidades)
-        double a = 1;
-        double b = -0.5;
-        double c = 0.2;
-        double d = 0;
+        // Coeficientes del polinomio de tercer grado (ajustables seg�n el comportamiento deseado)
+        double a = 0.5;
+        double b = 0.0;
+        double c = 0.0;
+        double d = 0.0;
 
-        // Tiempo inicial y duración total
+        // Tiempo inicial (en milisegundos)
         long startTime = System.currentTimeMillis();
-        long totalTime = 5000; // 5 segundos
+
+        // Tiempo total del movimiento (ajustable)
+        long totalTime = 10000; // 10 segundos
 
         while (System.currentTimeMillis() - startTime <= totalTime) {
-            // Calcular el tiempo normalizado (t entre 0 y 1)
+            // Calcular el tiempo actual normalizado entre 0 y 1
             double t = (double) (System.currentTimeMillis() - startTime) / totalTime;
 
-            // Calcular la posición y derivadas
-            double y = a * Math.pow(t, 3) + b * Math.pow(t, 2) + c * t + d;
-            double dy = 3 * a * Math.pow(t, 2) + 2 * b * t + c;
-            double ddy = 6 * a * t + 2 * b;
+            // Calcular la posici�n deseada y sus derivadas
+            double y = a * Math.pow(t, 3) + b * Math.pow(t, 2) + c * t + d;        // Posici�n
+            double dy = 3 * a * Math.pow(t, 2) + 2 * b * t + c;                    // Velocidad lineal
+            double ddy = 6 * a * t + 2 * b;                                       // Aceleraci�n (opcional para control avanzado)
 
-            // Velocidades deseadas
-            double v = dy; // Velocidad lineal
-            double omega = ddy; // Velocidad angular
+            // Velocidad lineal y angular deseada
+            double v = dy;         // Velocidad lineal proporcional a la derivada
+            double omega = ddy;    // Velocidad angular proporcional a la segunda derivada
 
-            // Enviar comandos al controlador
+            // Enviar comandos de velocidad al controlador
             drive(v, omega);
 
-            // Pausa breve
-            Delay.msDelay(50);
+            // Pausar brevemente para evitar sobrecargar el procesador
+            try {
+                Thread.sleep(50); // 50 ms
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         // Detener los motores al finalizar
@@ -408,7 +417,7 @@ public class ControlRST implements IControl {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
             	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.2;
             	KpRight = 0.6; KiRight = 0.75; KdRight = 0.3;
-                drive(1, 0); // Velocidad 10 cm/s, sin rotación
+                drive(1, 0); // Velocidad 10 cm/s, sin rotaci�n
                 if (navigation.getPose().getX() * 100 >= 120) {
                     stop();
                     status = 1;
@@ -416,10 +425,10 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 1: // Rotación a 15°/s
+            case 1: // Rotaci�n a 15�/s
             	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
         		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
-                drive(0, 15); // Rotación a 15°/s
+                drive(0, 15); // Rotaci�n a 15�/s
                 if (navigation.getPose().getHeading() * (180 / Math.PI) >= 70){
                     stop();
                     status = 2;
@@ -427,7 +436,7 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 2: // Avanzar en línea recta 30 cm a 5 cm/s
+            case 2: // Avanzar en l�nea recta 30 cm a 5 cm/s
             	KpLeft = 1.4; KiLeft = 1.4; KdLeft = 0.4;
             	KpRight = 1.2; KiRight = 1.5; KdRight = 0.4;
                 drive(0.5, 0); // Velocidad 5 cm/s
@@ -438,18 +447,18 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 3: // Rotación a -30°/s
+            case 3: // Rotaci�n a -30�/s
             	KpLeft = 0.4; KiLeft = 0.95; KdLeft = 0.025;
         		KpRight = 0.4; KiRight = 0.75; KdRight = 0.025;
-                drive(0, -30); // Rotación a -30°/s
+                drive(0, -30); // Rotaci�n a -30�/s
                 if (navigation.getPose().getHeading() * 180 / Math.PI <= 0) {
                     stop();
-                    status = 4; // Cambia al seguimiento de línea
+                    status = 4; // Cambia al seguimiento de l�nea
                     break;
                 }
                 break;
 
-            case 4: // Seguimiento de línea
+            case 4: // Seguimiento de l�nea
             	update_LINECTRL_Parameter();
                 exec_LINECTRL_ALGO();
                 break;
@@ -465,11 +474,14 @@ public class ControlRST implements IControl {
         rightMotor.forward();
         navigation.setUseOnlyOdometry(true);
         
-        switch (status) {
+      	update_PARKCTRL_Parameter();
+    	exec_PARKCTRL_ALGO();
+        
+        /*switch (status) {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
             	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
-                drive(1, 0); // Velocidad 10 cm/s, sin rotación
+                drive(1, 0); // Velocidad 10 cm/s, sin rotaci�n
                 if (navigation.getPose().getX() * 100 >= 120) {
                     stop();
                     status = 1;
@@ -477,10 +489,10 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 1: // Rotación a 15°/s
+            case 1: // Rotaci�n a 15�/s
             	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
         		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
-                drive(0, 15); // Rotación a 15°/s
+                drive(0, 15); // Rotaci�n a 15�/s
                 if (navigation.getPose().getHeading() * (180 / Math.PI) >= 70){
                     stop();
                     status = 2;
@@ -488,7 +500,7 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 2: // Avanzar en línea recta 30 cm a 5 cm/s
+            case 2: // Avanzar en l�nea recta 30 cm a 5 cm/s
             	KpLeft = 1.4; KiLeft = 1; KdLeft = 0.6;
             	KpRight = 1.2; KiRight = 1.5; KdRight = 0.8;
                 drive(0.5, 0); // Velocidad 5 cm/s
@@ -499,19 +511,19 @@ public class ControlRST implements IControl {
                 }
                 break;
 
-            case 3: // Rotación a -30°/s
+            case 3: // Rotaci�n a -30�/s
             	KpLeft = 0.4; KiLeft = 0.95; KdLeft = 0.025;
         		KpRight = 0.4; KiRight = 0.75; KdRight = 0.025;
-                drive(0, -30); // Rotación a -30°/s
+                drive(0, -30); // Rotaci�n a -30�/s
                 if (navigation.getPose().getHeading() * 180 / Math.PI <= 0) {
                     stop();
                     navigation.setPose(0, 0, 0);
-                    status = 4; // Cambia al seguimiento de línea
+                    status = 4; // Cambia al seguimiento de l�nea
                     break;
                 }
                 break;
 
-            case 4: // Seguimiento de línea
+            case 4: // Seguimiento de l�nea
             	update_LINECTRL_Parameter();
                 exec_LINECTRL_ALGO();
                 if (navigation.getPose().getX() * 100 <= -117) {
@@ -522,10 +534,10 @@ public class ControlRST implements IControl {
                 
                 break;
                 
-            case 5: // Rotación
+            case 5: // Rotaci�n
             	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
         		KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
-                drive(0, 15); // Rotación a 15°/s
+                drive(0, 15); // Rotaci�n a 15�/s
                 if (navigation.getPose().getHeading() * (180 / Math.PI) >= -30){
                     stop();
                     navigation.setPose(0, 0, 0);
@@ -537,8 +549,8 @@ public class ControlRST implements IControl {
             case 6: // Geradeausfahrt 120 cm mit 10 cm/s
             	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
-                drive(1, 0); // Velocidad 10 cm/s, sin rotación
-                if (navigation.getPose().getX() * 100 >= 10) {
+                drive(1, 0); // Velocidad 10 cm/s, sin rotaci�n
+                if (navigation.getPose().getX() * 100 >= 70) {
                     stop();
                     status = 7;
                     break;
@@ -546,14 +558,14 @@ public class ControlRST implements IControl {
                 break;
                 
             case 7:
-            	update_PARKCTRL_Parameter();
-            	exec_PARKCTRL_ALGO();
+            	//update_PARKCTRL_Parameter();
+            	//exec_PARKCTRL_ALGO();
             	break;
 
             default:
                 LCD.drawString("Unexpected status: " + status, 0, 7);
                 break;
-        }
+        }*/
     }
     
     private void exec_LINECTRL_ALGO() {
@@ -687,7 +699,7 @@ public class ControlRST implements IControl {
 	
 	// Aufgabe 3.2
 	
-	// ParÃ¡metros PID separados para cada rueda
+	// Parámetros PID separados para cada rueda
 
 	private void drive(double v, double omega) {
 	    // Parámetros del robot

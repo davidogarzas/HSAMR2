@@ -8,9 +8,11 @@ import lejos.nxt.Sound;
 import lejos.geom.Line;
 import lejos.nxt.LCD;
 
+import parkingRobot.INxtHmi;
 import parkingRobot.IControl;
 import parkingRobot.IControl.ControlMode;
 import parkingRobot.INavigation;
+import parkingRobot.INavigation.ParkingSlot.ParkingSlotStatus;
 import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
@@ -20,7 +22,10 @@ public class GuidanceAT {
         SCOUT,
         PAUSE,
         PARK,
-        EXIT
+        AUSPARKEN,
+        EXIT,
+        //DEMO1,
+        //DEMO2
     }
 
     protected static CurrentStatus currentStatus = CurrentStatus.PAUSE;
@@ -36,6 +41,9 @@ public class GuidanceAT {
     static Line line7 = new Line(0, 60, 0, 0);
 
     static Line[] map = {line0, line1, line2, line3, line4, line5, line6, line7};
+    
+    //local Mode variable to set hmi mode
+    private static INxtHmi.Mode currentMode = INxtHmi.Mode.PAUSE;
 
     public static void main(String[] args) throws Exception {
         while (Button.ENTER.isDown()) {}
@@ -55,11 +63,18 @@ public class GuidanceAT {
         navigation.setMap(map);
 
         IControl control = new ControlRST(perception, navigation, leftMotor, rightMotor, monitor);
+        INxtHmi  	hmi        = new HmiPLT(perception, navigation, control, monitor);
 
         monitor.startLogging();
 
         while (true) {
-            showData(navigation,perception);
+            showData(navigation, perception);
+            
+         // Update the state from HMI or buttons
+            updateStateFromHmiOrButtons(hmi);
+            
+         // Update the HMI mode based on the current state
+            updateHmiMode(monitor);
 
             switch (currentStatus) {
                 case SCOUT:
@@ -71,13 +86,27 @@ public class GuidanceAT {
                     break;
 
                 case PARK:
-                    handleParkMode(navigation, control); // Pass perception here
+                    handleParkMode(navigation, control, hmi); // Pass perception here
                     break;
 
                 case EXIT:
                     monitor.stopLogging();
                     System.exit(0);
                     break;
+                    
+                case AUSPARKEN:
+                	handleAusparkenMode(navigation, control);
+                	break;
+                    
+                 // --ADDED FOR DEMO--
+                /*case DEMO1:
+                    handleDemo1Mode(control);
+                    break;
+
+                // --ADDED FOR DEMO--
+                case DEMO2:
+                    handleDemo2Mode(control);
+                    break;*/
 
                 default:
                     break;
@@ -86,6 +115,147 @@ public class GuidanceAT {
             Thread.sleep(100);
         }
     }
+    
+    private static void updateStateFromHmiOrButtons(INxtHmi hmi) {
+        boolean buttonHandled = false; // Track if a button was pressed
+
+        // Check button inputs first
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.SCOUT;
+            buttonHandled = true;
+            while (Button.ENTER.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            buttonHandled = true;
+            while (Button.ESCAPE.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.RIGHT.isDown()) {
+            currentStatus = CurrentStatus.PARK;
+            buttonHandled = true;
+            while (Button.RIGHT.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        } else if (Button.LEFT.isDown()) {
+            currentStatus = CurrentStatus.AUSPARKEN;
+            buttonHandled = true;
+            while (Button.LEFT.isDown()) {
+                try {
+                    Thread.sleep(1); // Wait for button release
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        // If no button was pressed, use HMI mode if connected
+        if (!buttonHandled && hmi.getMode() != null) {
+            switch (hmi.getMode()) {
+                case SCOUT:
+                    currentStatus = CurrentStatus.SCOUT;
+                    break;
+                case PARK_NOW:
+                    currentStatus = CurrentStatus.PARK;
+                    break;
+                case PAUSE:
+                    currentStatus = CurrentStatus.PAUSE;
+                    break;
+                case DISCONNECT:
+                    currentStatus = CurrentStatus.EXIT;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    
+    // --ADDED FOR DEMO--
+    /*private static void handleDemo1Mode(IControl control) throws InterruptedException {
+        // Enter action
+        if (lastStatus != CurrentStatus.DEMO1) {
+            control.setCtrlMode(ControlMode.DEMO_PRG1); // or however you name it
+        }
+
+        lastStatus = currentStatus;
+
+        // Check transitions
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.PAUSE;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1);
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1);
+            }
+        }
+    }
+    
+    // --ADDED FOR DEMO--
+    private static void handleDemo2Mode(IControl control) throws InterruptedException {
+        // Enter action
+        if (lastStatus != CurrentStatus.DEMO2) {
+            control.setCtrlMode(ControlMode.DEMO_PRG2);
+        }
+
+        lastStatus = currentStatus;
+
+        // Check transitions
+        if (Button.ENTER.isDown()) {
+            currentStatus = CurrentStatus.PAUSE;
+            while (Button.ENTER.isDown()) {
+                Thread.sleep(1);
+            }
+        } else if (Button.ESCAPE.isDown()) {
+            currentStatus = CurrentStatus.EXIT;
+            while (Button.ESCAPE.isDown()) {
+                Thread.sleep(1);
+            }
+        }
+    }*/
+    
+ // Update HMI mode
+    private static void updateHmiMode(IMonitor monitor) {
+        // Determine the mode based on the current status
+        switch (currentStatus) {
+            case SCOUT:
+                currentMode = INxtHmi.Mode.SCOUT;
+                break;
+            case PARK:
+                currentMode = INxtHmi.Mode.PARK_NOW;
+                break;
+            case AUSPARKEN:
+            case PAUSE:
+                currentMode = INxtHmi.Mode.PAUSE;
+                break;
+            case EXIT:
+                currentMode = INxtHmi.Mode.DISCONNECT;
+                break;
+            default:
+                currentMode = INxtHmi.Mode.PAUSE;
+                break;
+        }
+
+        // Log the updated mode for monitoring
+        monitor.writeGuidanceComment("Updated HMI Mode: " + currentMode.name());
+    }
+    
 
     private static void handleScoutMode(INavigation navigation, IControl control) throws InterruptedException {
         if (lastStatus != CurrentStatus.SCOUT) {
@@ -93,9 +263,6 @@ public class GuidanceAT {
             navigation.setDetectionState(true);
             navigation.setUseOnlyOdometry(false);
         }
-
-        // Exception
-        //navigation.updateNavigation();
 
         lastStatus = currentStatus;
 
@@ -110,11 +277,16 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK;
+            currentStatus = CurrentStatus.PARK; //Change this to DEMO1 or PARK for testing
             while (Button.RIGHT.isDown()) {
                 Thread.sleep(1);
             }
         }
+        //uncomment this when testing DEMO2
+        /*else if (Button.LEFT.isDown()) {
+            currentStatus = CurrentStatus.DEMO2;
+            while (Button.LEFT.isDown()) { Thread.sleep(1); }
+        }*/
     }
 
     private static void handlePauseMode(IControl control) throws InterruptedException {
@@ -135,90 +307,110 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         }
+        //checks for demo1
+        else if (Button.RIGHT.isDown()) {
+        currentStatus = CurrentStatus.PARK; //Change to DEMO1 or PARK for testing
+        while (Button.RIGHT.isDown()) Thread.sleep(1);
+
+    // --- NEW: Jump to DEMO2 with left button ---
+    } /*else if (Button.LEFT.isDown()) {
+        currentStatus = CurrentStatus.DEMO2
+        while (Button.LEFT.isDown()) Thread.sleep(1);
+    }*/
+        
     }
 
-    private static void handleParkMode(INavigation navigation, IControl control) throws InterruptedException {
-    	//disable odometry to avoid conflicts
-    	 navigation.setUseOnlyOdometry(true);
+    private static void handleParkMode(INavigation navigation, IControl control, INxtHmi hmi) throws InterruptedException {
+        // Disable odometry-based corrections to avoid conflicts
+    	navigation.setDetectionState(false);
+
         // Get all available parking slots
         INavigation.ParkingSlot[] slots = navigation.getParkingSlots();
+        
+     // Get the selected parking slot from HMI
+        int selectedSlotID = hmi.getSelectedParkingSlot();
 
-       /* if (slots != null && slots.length > 0) {
-            // Select the first slot as the target (or implement a selection mechanism if needed)
-            INavigation.ParkingSlot targetSlot = slots[0];
+        if (slots != null && slots.length > 0) {
+            // Select the first suitable parking slot
+            INavigation.ParkingSlot targetSlot = null;
+            for (INavigation.ParkingSlot slot : slots) {
+                if (slot.getID() == selectedSlotID) {
+                    targetSlot = slot;
+                    break;
+                }
+            }
 
-            // Step 1: Calculate the middle point
-            double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
-            double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
+            if (targetSlot != null) {
+                double middleX = (targetSlot.getFrontBoundaryPosition().x + targetSlot.getBackBoundaryPosition().x) / 2;
+                double middleY = (targetSlot.getFrontBoundaryPosition().y + targetSlot.getBackBoundaryPosition().y) / 2;
 
-            // Display middle point details on LCD
+                LCD.clear();
+                LCD.drawString("Parking...", 0, 3);
+
+                control.setDestination(0, middleX, middleY);
+
+                while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
+                        || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
+                    navigation.setUseOnlyOdometry(true);
+                    if (Button.ENTER.isDown()) {
+                        currentStatus = CurrentStatus.PAUSE;
+                        while (Button.ENTER.isDown()) {
+                            Thread.sleep(1); // Wait for button release
+                        }
+                        return; // Exit the method to transition to PAUSE
+                    }
+                    Thread.sleep(100);
+                }
+            // Stop the robot at the middle point
+            control.setCtrlMode(IControl.ControlMode.INACTIVE);
+
+            // Display "Parking done" and beep once
             LCD.clear();
-            LCD.drawString("Middle X: " + (middleX * 100) + " cm", 0, 3);
-            LCD.drawString("Middle Y: " + (middleY * 100) + " cm", 0, 4);
-
-            // Step 2: Drive directly towards the middle point
-            control.setDestination(0, middleX, middleY);
-
-            // Wait until the robot reaches the middle point
-            while (Math.abs(navigation.getPose().getX() - middleX) > 0.1
-                    || Math.abs(navigation.getPose().getY() - middleY) > 0.1) {
-                navigation.updateNavigation();
-                Thread.sleep(100); // Allow time for movement and updates
-            }*/
-
-            // Parking sequence complete: Robot reaches middle point
-            //Sound.beepSequenceUp(); // Feedback to indicate reaching the middle point
-
-         // Step 3: Perform a 90-degree turn
+            LCD.drawString("Parking done", 0, 3);
+            Sound.beepSequence(); // Plays the beep sequence exactly once
+            Thread.sleep(1000); // Ensure the beeping completes
+        } else {
+            // Handle case where no parking slots are detected
             LCD.clear();
-            LCD.drawString("Turning 90 degrees", 0, 3);
-
-            // Get the current heading
-            double initialHeading = navigation.getPose().getHeading();
-
-            // Desired heading after a 90 degree turn (in radians)
-            double targetHeading = initialHeading + Math.PI / 2;
-            /*if (targetHeading > 2 * Math.PI) {
-                targetHeading -= 2 * Math.PI; // Ensure heading stays within [0, 2pi]
-            }*/
-
-            // Stop any ongoing control to take direct control of the motors
-            control.setCtrlMode(IControl.ControlMode.INACTIVE); 
-
-            // Access motors directly
-            NXTMotor leftMotor = ((ControlRST) control).leftMotor; 
-            NXTMotor rightMotor = ((ControlRST) control).rightMotor;
-
-            // Set motors for turning: Keep the left motor stationary and rotate the right motor
-            leftMotor.setPower(0); // stop the left motor
-            rightMotor.setPower(40); // Set power to the right motor
-            rightMotor.forward(); // Start turning the robot
-
-            // Keep turning until the robot reaches the target heading or timeout
-            /*while ((Math.abs(navigation.getPose().getHeading() - targetHeading) > 0.05)) {
-                navigation.updateNavigation(); // Update the navigation to get the latest pose
-                Thread.sleep(50); // Allow time for pose updates
-            }*/
-
-            // Stop the motors after turning
-           // leftMotor.stop();
-            //rightMotor.stop();
-
- 
-           // Sound.beepSequence(); // Feedback to indicate turn completion
-            //LCD.drawString("Turn Complete", 0, 6);
-     /*   } else {
-            // No parking slots available
-            LCD.drawString("No parking slots detected!", 0, 3);
+            LCD.drawString("No parking slots!", 0, 3);
         }
 
-        // Allow the user to exit PARK mode
-        if (Button.ESCAPE.isDown()) {
+        // Allow the user to transition to "ausparken" mode using the LEFT button
+        if (Button.LEFT.isDown()) {
+            currentStatus = CurrentStatus.AUSPARKEN;
+            while (Button.LEFT.isDown()) {
+                Thread.sleep(1); // Wait for button release
+            }
+        }
+        // Allow the user to exit using the ESCAPE button
+        else if (Button.ESCAPE.isDown()) {
             currentStatus = CurrentStatus.EXIT;
             while (Button.ESCAPE.isDown()) {
                 Thread.sleep(1); // Wait for button release
             }
-        }*/
+        }
+    }
+    }
+
+    private static void handleAusparkenMode(INavigation navigation, IControl control) throws InterruptedException {
+        // Display "Ausparken" for 3 seconds
+        LCD.clear();
+        LCD.drawString("Ausparken...", 0, 3);
+        navigation.setDetectionState(false);
+        navigation.setUseOnlyOdometry(true);
+        Thread.sleep(3000); // Wait for 3 seconds
+
+        // Transition to SCOUT mode immediately
+        LCD.clear();
+        LCD.drawString("Scout Mode", 0, 3);
+
+        // Directly initialize SCOUT mode logic
+        currentStatus = CurrentStatus.SCOUT;
+        lastStatus = CurrentStatus.AUSPARKEN; // Update lastStatus for consistency
+        Thread.sleep(1000); // Allow transition message to display
+
+        // Automatically start SCOUT mode
+        control.setCtrlMode(IControl.ControlMode.LINE_CTRL);
     }
 
     public static CurrentStatus getCurrentStatus() {
@@ -234,6 +426,7 @@ public class GuidanceAT {
         LCD.drawString("X (cm): " + (navigation.getPose().getX() * 100), 0, 0);
         LCD.drawString("Y (cm): " + (navigation.getPose().getY() * 100), 0, 1);
         LCD.drawString("Phi: " + (navigation.getPose().getHeading() / Math.PI * 180), 0, 2);
+        
         perception.showSensorData();
     }
 }
