@@ -357,9 +357,9 @@ public class ControlRST implements IControl {
     private void exec_PARKCTRL_ALGO() {
         // Coeficientes del polinomio de tercer grado (ajustables seg�n el comportamiento deseado)
         double a = 0.5;
-        double b = 0.0;
-        double c = 0.0;
-        double d = 0.0;
+        double b = 1.7;
+        double c = 0.9;
+        double d = 2.0;
 
         // Tiempo inicial (en milisegundos)
         long startTime = System.currentTimeMillis();
@@ -473,11 +473,9 @@ public class ControlRST implements IControl {
         leftMotor.forward();
         rightMotor.forward();
         navigation.setUseOnlyOdometry(true);
+       
         
-      	update_PARKCTRL_Parameter();
-    	exec_PARKCTRL_ALGO();
-        
-        /*switch (status) {
+        switch (status) {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
             	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
@@ -558,14 +556,14 @@ public class ControlRST implements IControl {
                 break;
                 
             case 7:
-            	//update_PARKCTRL_Parameter();
-            	//exec_PARKCTRL_ALGO();
+            	update_PARKCTRL_Parameter();
+            	exec_PARKCTRL_ALGO();
             	break;
 
             default:
                 LCD.drawString("Unexpected status: " + status, 0, 7);
                 break;
-        }*/
+        }
     }
     
     private void exec_LINECTRL_ALGO() {
