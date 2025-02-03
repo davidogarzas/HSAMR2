@@ -397,7 +397,92 @@ public class ControlRST implements IControl {
 	 * white = 0, black = 2, grey = 1
 	 */
     
-    int status = 6;
+    int step = 0;
+    
+	private void einparken(){
+		leftMotor.forward();
+	    rightMotor.forward();
+	    navigation.setUseOnlyOdometry(true);
+	    
+	    switch (step) {
+	    case 0:
+	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+	        drive(0, 15);
+	        if (navigation.getPose().getHeading() * (180 / Math.PI) >= 80){
+	        	navigation.setPose(0, 0, 0);
+	            stop();
+	            step = 1;
+	            break;
+	        }
+	        break;
+	        
+	    case 1:
+	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+	        drive(-1, 0); 
+	        if (navigation.getPose().getY() * 100 <= -5) {
+	            stop();
+	            step = 2;
+	            break;
+	        }
+	        break;
+	        
+	    case 2:
+	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+	        drive(0, -15);
+	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
+	        	navigation.setPose(101,0,0);
+	            stop();
+	            break;
+	        }
+	        break;
+	    }
+	}
+
+	private void ausparken(){
+		leftMotor.forward();
+	    rightMotor.forward();
+	    navigation.setUseOnlyOdometry(true);
+	    
+	    switch (step) {
+	    case 0:
+	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+	        drive(0, -15);
+	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -115){
+	        	navigation.setPose(0, 0, 0);
+	            stop();
+	            step = 1;
+	            break;
+	        }
+	        break;
+	        
+	    case 1:
+	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+	        drive(1, 0); 
+	        if (navigation.getPose().getY() * 100 >= 5) {
+	            stop();
+	            step = 2;
+	            break;
+	        }
+	        break;
+	        
+	    case 2:
+	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+	        drive(0, -15);
+	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -90){
+	            stop();
+	            break;
+	        }
+	        break;
+	    }
+	}
+
+    int status = 0;
     
     private void exec_DEMOPRG1_ALGO() {
         leftMotor.forward();
@@ -519,7 +604,6 @@ public class ControlRST implements IControl {
                     status = 5;
                     break;
                 }
-                
                 break;
                 
             case 5: // Rotación
@@ -534,28 +618,289 @@ public class ControlRST implements IControl {
                 }
                 break;
                 
-            case 6: // Geradeausfahrt 120 cm mit 10 cm/s
+            case 6:
             	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
-                drive(1, 0); // Velocidad 10 cm/s, sin rotación
-                if (navigation.getPose().getX() * 100 >= 10) {
+                drive(1, 0);
+                if (navigation.getPose().getX() * 100 >= 50) {
                     stop();
                     status = 7;
                     break;
                 }
                 break;
-                
+ 
             case 7:
-            	update_PARKCTRL_Parameter();
-            	exec_PARKCTRL_ALGO();
-            	break;
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, 15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) >= 80){
+    	        	navigation.setPose(0, 0, 0);
+    	            stop();
+    	            status = 8;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 8:
+    	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+    	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+    	        drive(-1, 0); 
+    	        try {
+    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	        } catch (InterruptedException e) {
+    	            e.printStackTrace();
+    	        }
+    	        stop();
+    	        status = 9;
+    	        /*if (navigation.getPose().getY() * 100 <= -5) {
+    	            stop();
+    	            status = 9;
+    	            break;
+    	        }*/
+    	        break;
+    	        
+    	    case 9:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, -15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
+    	        	navigation.setPose(101,0,0);
+    	            stop();
+    	            try {
+    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	            } catch (InterruptedException e) {
+    	                e.printStackTrace();
+    	            }
+    	            status = 10;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 10:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, 15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) >= 80){
+    	        	navigation.setPose(0, 0, 0);
+    	            stop();
+    	            status = 11;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 11:
+    	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+    	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+    	        drive(1, 0); 
+    	        
+    	        try {
+    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	        } catch (InterruptedException e) {
+    	            e.printStackTrace();
+    	        }
+    	        stop();
+    	        status = 12;
+    	        
+    	        /*if (navigation.getPose().getY() * 100 <= -5) {
+    	            stop();
+    	            status = 12;
+    	            break;
+    	        }*/
+    	        break;
+    	        
+    	    case 12:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, -15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
+    	        	navigation.setPose(0,0,0);
+    	            stop();
+    	            try {
+    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	            } catch (InterruptedException e) {
+    	                e.printStackTrace();
+    	            }
+    	            status = 13;
+    	            break;
+    	        }
+    	        break;
+    	         
+    	    case 13: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
+                exec_LINECTRL_ALGO();
+                /*if (navigation.getPose().getX() * 100 <= -117) {
+                    stop();
+                    status = 14;
+                    break;
+                }*/
+                break;
+   
+            case 14:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, 15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) >= 80){
+    	        	navigation.setPose(0, 0, 0);
+    	            stop();
+    	            status = 15;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 15:
+    	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+    	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+    	        drive(-1, 0); 
+    	        try {
+    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	        } catch (InterruptedException e) {
+    	            e.printStackTrace();
+    	        }
+    	        stop();
+    	        status = 16;
+    	        /*if (navigation.getPose().getY() * 100 <= -5) {
+    	            stop();
+    	            status = 9;
+    	            break;
+    	        }*/
+    	        break;
+    	        
+    	    case 16:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, -15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
+    	        	navigation.setPose(101,0,0);
+    	            stop();
+    	            try {
+    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	            } catch (InterruptedException e) {
+    	                e.printStackTrace();
+    	            }
+    	            status = 17;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 17:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, 15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) >= 80){
+    	        	navigation.setPose(0, 0, 0);
+    	            stop();
+    	            status = 18;
+    	            break;
+    	        }
+    	        break;
+    	        
+    	    case 18:
+    	    	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+    	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
+    	        drive(1, 0); 
+    	        
+    	        try {
+    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	        } catch (InterruptedException e) {
+    	            e.printStackTrace();
+    	        }
+    	        stop();
+    	        status = 19;
+    	        
+    	        /*if (navigation.getPose().getY() * 100 <= -5) {
+    	            stop();
+    	            status = 12;
+    	            break;
+    	        }*/
+    	        break;
+    	        
+    	    case 19:
+    	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
+    			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
+    	        drive(0, -15);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
+    	        	navigation.setPose(0,0,0);
+    	            stop();
+    	            try {
+    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	            } catch (InterruptedException e) {
+    	                e.printStackTrace();
+    	            }
+    	            status = 20;
+    	            break;
+    	        }
+    	        break;
+    	         
+    	    case 20: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
+                exec_LINECTRL_ALGO();
+                break;
+        }
+    }
+    
+    
+    private void exec_DEMOPRG3_ALGO() {
+        leftMotor.forward();
+        rightMotor.forward();
+        navigation.setUseOnlyOdometry(true);
+        
+        switch (status) {
+            case 0:
+            	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
+            	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
+                drive(1, 0);
+                if (navigation.getPose().getX() * 100 >= 40) {
+                    stop();
+                    status = 1;
+                    break;
+                }
+                break;
+ 
+            case 1:
+            	einparken();
+            	//stop();
+            	status = 2;
+                break;
+                
+            case 2:
+            	ausparken();
+            	//stop();
+            	status = 3;
+                break;
+                
+            case 3: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
+                exec_LINECTRL_ALGO();
+                if (navigation.getPose().getX() * 100 <= -117) {
+                    stop();
+                    status = 4;
+                    break;
+                }
+                break;
+                
+            case 4:
+            	einparken();
+            	stop();
+            	status = 5;
+                break;
+                
+            case 5:
+            	ausparken();
+            	stop();
+            	status = 6;
+                break;
+                
+            case 6: // Seguimiento de línea
+            	update_LINECTRL_Parameter();
+                exec_LINECTRL_ALGO();
+                break;
 
             default:
                 LCD.drawString("Unexpected status: " + status, 0, 7);
                 break;
         }
     }
-    
+
     private void exec_LINECTRL_ALGO() {
     	// Beide Motoren starten vorwärts
         leftMotor.forward();
