@@ -35,7 +35,7 @@ import parkingRobot.hsamr2.NavigationThread;
 public class NavigationAT implements INavigation{
 	
 	// For use by other modules
-	boolean guidance_testing = false;
+	boolean guidance_testing = true;
 	boolean useOnlyOdometry = false;
 	
 	// Map Variables

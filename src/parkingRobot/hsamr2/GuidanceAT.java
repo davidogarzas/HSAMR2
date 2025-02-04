@@ -17,15 +17,17 @@ import parkingRobot.IPerception;
 import parkingRobot.IMonitor;
 
 public class GuidanceAT {
-
+	
+	static boolean DEMO = true;
+	
     public enum CurrentStatus {
         SCOUT,
         PAUSE,
         PARK,
         AUSPARKEN,
         EXIT,
-        //DEMO1,
-        //DEMO2
+        DEMO1,
+        DEMO2
     }
 
     protected static CurrentStatus currentStatus = CurrentStatus.PAUSE;
@@ -99,14 +101,18 @@ public class GuidanceAT {
                 	break;
                     
                  // --ADDED FOR DEMO--
-                /*case DEMO1:
-                    handleDemo1Mode(control);
-                    break;
+                case DEMO1:
+                	if (DEMO){
+                		handleDemo1Mode(control);
+                		break;
+                	}
 
                 // --ADDED FOR DEMO--
                 case DEMO2:
-                    handleDemo2Mode(control);
-                    break;*/
+                	if (DEMO){
+	                    handleDemo2Mode(control);
+	                    break;
+                	}
 
                 default:
                     break;
@@ -141,7 +147,8 @@ public class GuidanceAT {
                 }
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK;
+        	if (DEMO){currentStatus = CurrentStatus.DEMO1;}
+        	else {currentStatus = CurrentStatus.PARK;} //Change this to DEMO1 or PARK for testing
             buttonHandled = true;
             while (Button.RIGHT.isDown()) {
                 try {
@@ -151,7 +158,8 @@ public class GuidanceAT {
                 }
             }
         } else if (Button.LEFT.isDown()) {
-            currentStatus = CurrentStatus.AUSPARKEN;
+        	if (DEMO){currentStatus = CurrentStatus.DEMO2;}
+        	else {currentStatus = CurrentStatus.AUSPARKEN;} //Change this to DEMO1 or PARK for testing
             buttonHandled = true;
             while (Button.LEFT.isDown()) {
                 try {
@@ -185,7 +193,7 @@ public class GuidanceAT {
 
     
     // --ADDED FOR DEMO--
-    /*private static void handleDemo1Mode(IControl control) throws InterruptedException {
+    private static void handleDemo1Mode(IControl control) throws InterruptedException {
         // Enter action
         if (lastStatus != CurrentStatus.DEMO1) {
             control.setCtrlMode(ControlMode.DEMO_PRG1); // or however you name it
@@ -228,7 +236,7 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         }
-    }*/
+    }
     
  // Update HMI mode
     private static void updateHmiMode(IMonitor monitor) {
@@ -277,16 +285,17 @@ public class GuidanceAT {
                 Thread.sleep(1);
             }
         } else if (Button.RIGHT.isDown()) {
-            currentStatus = CurrentStatus.PARK; //Change this to DEMO1 or PARK for testing
+        	if (DEMO){currentStatus = CurrentStatus.DEMO1;}
+        	else {currentStatus = CurrentStatus.PARK;} //Change this to DEMO1 or PARK for testing
             while (Button.RIGHT.isDown()) {
                 Thread.sleep(1);
             }
         }
         //uncomment this when testing DEMO2
-        /*else if (Button.LEFT.isDown()) {
+        else if (Button.LEFT.isDown() && DEMO) {
             currentStatus = CurrentStatus.DEMO2;
             while (Button.LEFT.isDown()) { Thread.sleep(1); }
-        }*/
+        }
     }
 
     private static void handlePauseMode(IControl control) throws InterruptedException {
@@ -309,14 +318,15 @@ public class GuidanceAT {
         }
         //checks for demo1
         else if (Button.RIGHT.isDown()) {
-        currentStatus = CurrentStatus.PARK; //Change to DEMO1 or PARK for testing
+        	if (DEMO){currentStatus = CurrentStatus.DEMO1;}
+        	else {currentStatus = CurrentStatus.PARK;} //Change this to DEMO1 or PARK for testing
         while (Button.RIGHT.isDown()) Thread.sleep(1);
 
     // --- NEW: Jump to DEMO2 with left button ---
-    } /*else if (Button.LEFT.isDown()) {
-        currentStatus = CurrentStatus.DEMO2
+    } else if (Button.LEFT.isDown() && DEMO) {
+        currentStatus = CurrentStatus.DEMO2;
         while (Button.LEFT.isDown()) Thread.sleep(1);
-    }*/
+    }
         
     }
 

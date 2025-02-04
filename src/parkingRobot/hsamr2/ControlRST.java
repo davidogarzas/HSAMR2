@@ -562,7 +562,7 @@ public class ControlRST implements IControl {
         
         switch (status) {
             case 0: // Geradeausfahrt 120 cm mit 10 cm/s
-            	KpLeft = 0.7; KiLeft = 0.5; KdLeft = 0.3;
+            	KpLeft = 0.7; KiLeft = 0.75; KdLeft = 0.35;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
                 drive(1, 0); // Velocidad 10 cm/s, sin rotaci�n
                 if (navigation.getPose().getX() * 100 >= 120) {
@@ -629,7 +629,7 @@ public class ControlRST implements IControl {
                 break;
                 
             case 6:
-            	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
+            	KpLeft = 0.7; KiLeft = 0.8; KdLeft = 0.4;
             	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
                 drive(1, 0);
                 if (navigation.getPose().getX() * 100 >= 50) {
@@ -656,17 +656,12 @@ public class ControlRST implements IControl {
     	    	KpRight = 0.6; KiRight = 0.7; KdRight = 0.4;
     	        drive(-1, 0); 
     	        try {
-    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	            Thread.sleep(2800); // Pausa de 5 segundos
     	        } catch (InterruptedException e) {
     	            e.printStackTrace();
     	        }
     	        stop();
     	        status = 9;
-    	        /*if (navigation.getPose().getY() * 100 <= -5) {
-    	            stop();
-    	            status = 9;
-    	            break;
-    	        }*/
     	        break;
     	        
     	    case 9:
@@ -674,10 +669,10 @@ public class ControlRST implements IControl {
     			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
     	        drive(0, -15);
     	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
-    	        	navigation.setPose(101,0,0);
+    	        	navigation.setPose(0,0,0);
     	            stop();
     	            try {
-    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	                Thread.sleep(1000); // Pausa de 5 segundos
     	            } catch (InterruptedException e) {
     	                e.printStackTrace();
     	            }
@@ -704,32 +699,26 @@ public class ControlRST implements IControl {
     	        drive(1, 0); 
     	        
     	        try {
-    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	            Thread.sleep(1900); // Pausa de 5 segundos
     	        } catch (InterruptedException e) {
     	            e.printStackTrace();
     	        }
     	        stop();
     	        status = 12;
-    	        
-    	        /*if (navigation.getPose().getY() * 100 <= -5) {
-    	            stop();
-    	            status = 12;
-    	            break;
-    	        }*/
     	        break;
     	        
     	    case 12:
     	    	KpLeft = 0.8; KiLeft = 1.9; KdLeft = 0.05;
     			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
     	        drive(0, -15);
-    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
-    	        	navigation.setPose(0,0,0);
+    	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){	
     	            stop();
     	            try {
-    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	                Thread.sleep(1000); // Pausa de 5 segundos
     	            } catch (InterruptedException e) {
     	                e.printStackTrace();
     	            }
+    	            navigation.setPose(0,0,0);
     	            status = 13;
     	            break;
     	        }
@@ -738,11 +727,11 @@ public class ControlRST implements IControl {
     	    case 13: // Seguimiento de línea
             	update_LINECTRL_Parameter();
                 exec_LINECTRL_ALGO();
-                /*if (navigation.getPose().getX() * 100 <= -117) {
+                if (navigation.getPose().getX() * 100 >= 130) {
                     stop();
                     status = 14;
                     break;
-                }*/
+                }
                 break;
    
             case 14:
@@ -768,11 +757,6 @@ public class ControlRST implements IControl {
     	        }
     	        stop();
     	        status = 16;
-    	        /*if (navigation.getPose().getY() * 100 <= -5) {
-    	            stop();
-    	            status = 9;
-    	            break;
-    	        }*/
     	        break;
     	        
     	    case 16:
@@ -780,10 +764,10 @@ public class ControlRST implements IControl {
     			KpRight = 0.8; KiRight = 1.5; KdRight = 0.05;
     	        drive(0, -15);
     	        if (navigation.getPose().getHeading() * (180 / Math.PI) <= -75){
-    	        	navigation.setPose(101,0,0);
+    	        	navigation.setPose(0,0,0);
     	            stop();
     	            try {
-    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	                Thread.sleep(1000); // Pausa de 5 segundos
     	            } catch (InterruptedException e) {
     	                e.printStackTrace();
     	            }
@@ -810,18 +794,12 @@ public class ControlRST implements IControl {
     	        drive(1, 0); 
     	        
     	        try {
-    	            Thread.sleep(3000); // Pausa de 5 segundos
+    	            Thread.sleep(1900); // Pausa de 5 segundos
     	        } catch (InterruptedException e) {
     	            e.printStackTrace();
     	        }
     	        stop();
     	        status = 19;
-    	        
-    	        /*if (navigation.getPose().getY() * 100 <= -5) {
-    	            stop();
-    	            status = 12;
-    	            break;
-    	        }*/
     	        break;
     	        
     	    case 19:
@@ -832,7 +810,7 @@ public class ControlRST implements IControl {
     	        	navigation.setPose(0,0,0);
     	            stop();
     	            try {
-    	                Thread.sleep(5000); // Pausa de 5 segundos
+    	                Thread.sleep(1000); // Pausa de 5 segundos
     	            } catch (InterruptedException e) {
     	                e.printStackTrace();
     	            }
@@ -848,69 +826,6 @@ public class ControlRST implements IControl {
         }
     }
     
-    
-    private void exec_DEMOPRG3_ALGO() {
-        leftMotor.forward();
-        rightMotor.forward();
-        navigation.setUseOnlyOdometry(true);
-        
-        switch (status) {
-            case 0:
-            	KpLeft = 0.7; KiLeft = 0.6; KdLeft = 0.3;
-            	KpRight = 0.6; KiRight = 0.7; KdRight = 0.35;
-                drive(1, 0);
-                if (navigation.getPose().getX() * 100 >= 40) {
-                    stop();
-                    status = 1;
-                    break;
-                }
-                break;
- 
-            case 1:
-            	einparken();
-            	//stop();
-            	status = 2;
-                break;
-                
-            case 2:
-            	ausparken();
-            	//stop();
-            	status = 3;
-                break;
-                
-            case 3: // Seguimiento de línea
-            	update_LINECTRL_Parameter();
-                exec_LINECTRL_ALGO();
-                if (navigation.getPose().getX() * 100 <= -117) {
-                    stop();
-                    status = 4;
-                    break;
-                }
-                break;
-                
-            case 4:
-            	einparken();
-            	stop();
-            	status = 5;
-                break;
-                
-            case 5:
-            	ausparken();
-            	stop();
-            	status = 6;
-                break;
-                
-            case 6: // Seguimiento de línea
-            	update_LINECTRL_Parameter();
-                exec_LINECTRL_ALGO();
-                break;
-
-            default:
-                LCD.drawString("Unexpected status: " + status, 0, 7);
-                break;
-        }
-    }
-
     private void exec_LINECTRL_ALGO() {
     	// Beide Motoren starten vorwärts
         leftMotor.forward();
