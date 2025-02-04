@@ -34,7 +34,7 @@ import parkingRobot.hsamr2.NavigationThread;
 
 public class NavigationAT implements INavigation{
 	
-	// For other modules
+	// For use by other modules
 	boolean guidance_testing = false;
 	boolean useOnlyOdometry = false;
 	
@@ -59,36 +59,23 @@ public class NavigationAT implements INavigation{
 	long turnTime = 0;
 	double cornerTurnAngleResult = 0;
 	boolean onWhite 	= false;
+	boolean goingStraight = false;
 
 	// Angle Correction Variables
 	int angleCorrectionState = 0;
 	long angleCorrectionRefTime = 0;
-
-	// Parking Slot Variables
-
-	boolean goingStraight = false;
-		
-	// Custom Variables
-	long parkingSlotTime = 0;
-	int lineAtMeasurement = 0;
-	int freeSpaceCounter = 0;
-	int wallCounter = 0;
 	
-	double wallDistanceAverageSum = 0;
-	int wallDistanceAverageCounter = 0;
-	double wallDistanceAverage = 0;
-	
+	// Parking Slots Variables
 	LinkedList<ParkingSlot> parkingSlotsList = new LinkedList<ParkingSlot>();
 	LinkedList<ParkingSlot> parkingSlotsListTest = new LinkedList<ParkingSlot>();
-	
-	// For parkingSlots
+	int freeSpaceCounter = 0;
+	int wallCounter = 0;
+	int lineAtMeasurement = 0;
+
 	float measurementQualityEncoders = 100;
 	double measurementQualityDistanceFactor = 0.25;
 	float measurementQualityBack = 100;
 	float measurementQualityFront = 100;
-
-	Point FSSensorPoint = new Point(0,0);
-	Point BSSensorPoint = new Point(0,0);
 	
 	Point temporaryPoint = new Point(0,0);
 	Point parkingSlotBackPoint = new Point(0,0);
@@ -96,6 +83,10 @@ public class NavigationAT implements INavigation{
 
 	int parking_slot_state = 0;
 	int parkingSlotID = 0;
+	
+	double wallDistanceAverageSum = 0;
+	int wallDistanceAverageCounter = 0;
+	double wallDistanceAverage = 0;
 	
 	/**
 	 * line information measured by light sensor: 0 - beside line, 1 - on line border or 
@@ -154,13 +145,11 @@ public class NavigationAT implements INavigation{
 	 */
 	static final double LEFT_WHEEL_RADIUS	= 	0.028; 
 	static final double RIGHT_WHEEL_RADIUS	= 	0.028; 
-	// only rough guess, to be measured exactly and maybe refined by experiments
 	
 	/**
 	 * robot specific constant: distance between wheels
 	 */
 	static final double WHEEL_DISTANCE		= 	0.138; 
-	// only rough guess, to be measured exactly and maybe refined by experiments
 
 	
 	/**
@@ -272,8 +261,6 @@ public class NavigationAT implements INavigation{
 	 */
 	public void setMap(Line[] map){
 		this.map = map;		
-		
-		
 	}
 	
 	/* (non-Javadoc)
@@ -285,6 +272,12 @@ public class NavigationAT implements INavigation{
 	
 	public void setUseOnlyOdometry(boolean isOn){
 		this.useOnlyOdometry = isOn;
+	}
+	
+	// For control demo
+	public void setPose(float x, float y, float phi){
+		this.pose.setLocation(x, y); // [m]
+		this.pose.setHeading(phi); // [rad]
 	}
 	
 	
@@ -332,7 +325,7 @@ public class NavigationAT implements INavigation{
 		for (int i=0; i<this.map.length; i++){
 			this.mapLineAngles[i] = this.map[i].getP1().angleTo(this.map[i].getP2());
 			
-			// Turns all angles positive (from 0ï¿½ to 360ï¿½)
+			// Turns all angles positive (from 0° to 360°)
 			if (this.mapLineAngles[i] < 0){this.mapLineAngles[i] += 360;}
 		}
 	}
@@ -341,9 +334,6 @@ public class NavigationAT implements INavigation{
 		
 		boolean turn_corner = false;
 					
-		// Method 4
-		// Combines method 1, 2 and 3
-		// Allows for each of the 'components' to be less strict on their own
 		if (this.stateCornerTurn == 0){
 			if (!this.onWhite){
 				this.stateCornerTurn = 1;
@@ -517,7 +507,7 @@ public class NavigationAT implements INavigation{
 	
 	private void onNewLine(){
 		
-		// Updates angle of finished line (on next lap, it will need +360ï¿½)
+		// Updates angle of finished line (on next lap, it will need +360°)
 		this.mapLineAngles[this.currentLine] += 360;
 		
 		// Updates Current Line Index of the Map
@@ -608,7 +598,7 @@ public class NavigationAT implements INavigation{
 		double[] pose_results = new double[3];
 		// pose_results[0] = xResult [m]
 		// pose_results[1] = yResult [m]
-		// pose_results[2] = angleResult [ï¿½]
+		// pose_results[2] = angleResult [°]
 		
 		// Calculates pose using odometry/ encoders 
 		pose_results = this.calculateOdometry();
@@ -635,8 +625,8 @@ public class NavigationAT implements INavigation{
 		monitor.writeNavigationVar("Line", "" + this.currentLine);
 		monitor.writeNavigationVar("X", "" + (pose_results[0] * 100)); // [cm]
 		monitor.writeNavigationVar("Y", "" + (pose_results[1] * 100)); // [cm]
-		monitor.writeNavigationVar("Phi", "" + pose_results[2]); // [ï¿½]
-		monitor.writeNavigationVar("PhiError", "" + (pose_results[2] - this.currentLineAngle));	// [ï¿½]
+		monitor.writeNavigationVar("Phi", "" + pose_results[2]); // [°]
+		monitor.writeNavigationVar("PhiError", "" + (pose_results[2] - this.currentLineAngle));	// [°]
 		monitor.writeNavigationVar("wallDistanceFrontSide", "" + this.frontSideSensorDistance);
 		monitor.writeNavigationVar("wallDistanceBackSide", "" + this.backSideSensorDistance);
 		
@@ -676,6 +666,7 @@ public class NavigationAT implements INavigation{
 					- displacementProjectedLine*Math.cos(Math.toRadians(this.currentLineAngle)) 
 				);
 		
+		// Checks that projected line doesnt intersect any course line
 		for (int i=0; i<this.map.length; i++){
 			validPoint = !this.map[i].intersectsLine(projectedLine);
 			if (!validPoint){break;}
@@ -731,14 +722,14 @@ public class NavigationAT implements INavigation{
 	private float calculateMeasurementQuality(double angleAtMeasurement){
 		
 		double measurementQuality = 0;
-		double measurementQualityAngle = 0; // 90ï¿½ is max error
+		double measurementQualityAngle = 0; // 30° is max error
 		double measurementQualityPose = 0;  // 10 cm is max error	
 		
 		// Quality based on error from expected X or Y coordinate
 		if (this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getY()*100 - this.constantY)*100/10;}
 		else if (!this.horizontalLine){measurementQualityPose = 100 - Math.abs(this.pose.getX()*100 - this.constantX)*100/10;}
 		
-		// Quality based on angle at time of measurement (30ï¿½ is max error)
+		// Quality based on angle at time of measurement (30° is max error)
 		measurementQualityAngle = 100 - (Math.abs(angleAtMeasurement-this.currentLineAngle))*100/30;
 		
 		// Sum of quality factors
@@ -766,7 +757,7 @@ public class NavigationAT implements INavigation{
 		
 		double freeSpaceThreshhold = 20;
 		
-		double angleAtMeasurement = 0; // [ï¿½]
+		double angleAtMeasurement = 0; // [°]
 
 		int indexBackPoint = 0;
 		int indexFrontPoint = 0;
@@ -784,15 +775,11 @@ public class NavigationAT implements INavigation{
 		boolean frontPointExists = false;
 		
 		ParkingSlotStatus parkingSlotStatus = ParkingSlotStatus.NOT_SUITABLE_FOR_PARKING;
-
-		// state 0 = Looking for Beginning of Possible Slot
-		// state 1 = Measuring Possible Slot
-		// Make new states for when backSensorFindsPoint
 		
 		boolean FSSensorInWallThreshhold = this.frontSideSensorDistance >= wallDistanceLowerThreshhold && this.frontSideSensorDistance <= wallDistanceUpperThreshhold;
 		boolean FSSensorDetectsFreeSpace = this.frontSideSensorDistance >= freeSpaceThreshhold;
 
-		boolean BSSensorInWallThreshhold = this.backSideSensorDistance >= wallDistanceLowerThreshhold && this.backSideSensorDistance <= wallDistanceUpperThreshhold;
+		//boolean BSSensorInWallThreshhold = this.backSideSensorDistance >= wallDistanceLowerThreshhold && this.backSideSensorDistance <= wallDistanceUpperThreshhold;
 		boolean BSSensorDetectsFreeSpace = this.backSideSensorDistance >= freeSpaceThreshhold;
 		
 		// Avoids corners
@@ -825,7 +812,7 @@ public class NavigationAT implements INavigation{
 
 						this.lineAtMeasurement = this.currentLine;
 
-						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[ï¿½]
+						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[°]
 						wallMeasurement = 10; //cm
 						
 						this.saveParkingSlotCoordinate(saveBackPoint,FSSensorFromCenter,wallMeasurement,angleAtMeasurement);
@@ -870,7 +857,7 @@ public class NavigationAT implements INavigation{
 						
 						if (validPoint){
 							
-							angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[ï¿½]
+							angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[°]
 							wallMeasurement = 10; //cm
 							
 							this.saveParkingSlotCoordinate(saveTemporaryPoint,BSSensorFromCenter,wallMeasurement,angleAtMeasurement);
@@ -940,7 +927,7 @@ public class NavigationAT implements INavigation{
 					
 					if (validPoint){
 						
-						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[ï¿½]
+						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[°]
 						wallMeasurement = 10; //cm
 						
 						this.saveParkingSlotCoordinate(saveTemporaryPoint,BSSensorFromCenter,wallMeasurement,angleAtMeasurement);
@@ -979,7 +966,7 @@ public class NavigationAT implements INavigation{
 						this.parking_slot_state = 4;
 						monitor.writeNavigationComment("To state: " + this.parking_slot_state);
 						
-						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[ï¿½]
+						angleAtMeasurement = Math.toDegrees(this.pose.getHeading()); //[°]
 						wallMeasurement = this.frontSideSensorDistance; //cm
 						
 						this.saveParkingSlotCoordinate(saveFrontPoint,FSSensorFromCenter,wallMeasurement,angleAtMeasurement);
